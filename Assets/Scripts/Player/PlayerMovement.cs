@@ -32,7 +32,8 @@ public class PlayerMovement : MonoBehaviour
 
     private bool isCrouching;
     public bool isHoldingItem;
-   
+    public bool isDead;
+
     // New: request flag so jump triggers immediately on button down
     private bool jumpRequested;
  
