@@ -95,7 +95,7 @@ public class Maze : MonoBehaviour
                         // instantiate paths or other objects
                         // this should have nothing in it so we can see the floor
                         // or a vent or something  that needs emptie space 
-                       // Instantiate(path, position, Quaternion.identity);
+                        Instantiate(path, position, Quaternion.identity);
                     }
                 }
             }
