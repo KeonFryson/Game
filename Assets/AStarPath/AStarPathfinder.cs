@@ -9,15 +9,13 @@ public class AStarPathfinder : MonoBehaviour
     [SerializeField] private Vector3 gridWorldSize = new Vector3(50f, 10f, 50f);
     [SerializeField] private float nodeRadius = 0.2f;
     [SerializeField] private LayerMask unwalkableMask;
-    [SerializeField] private LayerMask groundLayerMask;
-    [SerializeField] private float maxRaycastDistance = 100f;
-    [SerializeField] private float heightAboveGround = 5f;
+    [SerializeField] private LayerMask groundLayerMask; // Renamed: Ground layer to detect
+    [SerializeField] private float maxRaycastDistance = 100f; // Max distance to raycast down for ground
+    [SerializeField] private float heightAboveGround = 5f; // How many nodes to create above ground level
 
     [Header("Performance")]
-    [SerializeField] private int maxIterations = 1000;
-    [SerializeField] private bool disableAutoGridUpdate = false;
-    [SerializeField] private bool useIncrementalUpdates = true;
-    [SerializeField] private int nodesPerFrameUpdate = 100; // Spread updates across frames
+    [SerializeField] private int maxIterations = 1000; // Prevent infinite loops
+    [SerializeField] private bool disableAutoGridUpdate = false; // Option to disable periodic updates
 
     [Header("Debug")]
     [SerializeField] private bool displayGridGizmos = false;
@@ -29,18 +27,6 @@ public class AStarPathfinder : MonoBehaviour
     private int gridSizeX, gridSizeY, gridSizeZ;
     private float gridUpdateTimer = 0f;
     private const float GRID_UPDATE_INTERVAL = 5f;
-
-    // Optimization: Cache ground heights to avoid repeated raycasts
-    private Dictionary<Vector2Int, float> groundHeightCache;
-    private Vector3 worldBottomLeft;
-    
-    // Incremental update tracking
-    private bool isUpdatingGrid = false;
-    private int updateXIndex = 0;
-    private int updateZIndex = 0;
-
-    // Cached values to avoid repeated calculations
-    private float nodeRadiusExpanded;
 
     private void Awake()
     {
@@ -55,14 +41,9 @@ public class AStarPathfinder : MonoBehaviour
         }
 
         nodeDiameter = nodeRadius * 2;
-        nodeRadiusExpanded = nodeRadius * 1.1f;
         gridSizeX = Mathf.RoundToInt(gridWorldSize.x / nodeDiameter);
         gridSizeY = Mathf.RoundToInt(gridWorldSize.y / nodeDiameter);
         gridSizeZ = Mathf.RoundToInt(gridWorldSize.z / nodeDiameter);
-        
-        groundHeightCache = new Dictionary<Vector2Int, float>(gridSizeX * gridSizeZ);
-        worldBottomLeft = transform.position - Vector3.right * gridWorldSize.x / 2 - Vector3.up * gridWorldSize.y / 2 - Vector3.forward * gridWorldSize.z / 2;
-        
         CreateGrid();
     }
 
@@ -70,121 +51,65 @@ public class AStarPathfinder : MonoBehaviour
     {
         if (disableAutoGridUpdate) return;
 
-        if (useIncrementalUpdates && isUpdatingGrid)
+        gridUpdateTimer += Time.deltaTime;
+
+        if (gridUpdateTimer >= GRID_UPDATE_INTERVAL)
         {
-            UpdateGridIncremental();
-        }
-        else
-        {
-            gridUpdateTimer += Time.deltaTime;
-
-            if (gridUpdateTimer >= GRID_UPDATE_INTERVAL)
-            {
-                if (useIncrementalUpdates)
-                {
-                    StartIncrementalUpdate();
-                }
-                else
-                {
-                    CreateGrid();
-                }
-                gridUpdateTimer = 0f;
-            }
-        }
-    }
-
-    private void StartIncrementalUpdate()
-    {
-        isUpdatingGrid = true;
-        updateXIndex = 0;
-        updateZIndex = 0;
-        groundHeightCache.Clear();
-    }
-
-    private void UpdateGridIncremental()
-    {
-        int nodesProcessed = 0;
-
-        while (nodesProcessed < nodesPerFrameUpdate && updateXIndex < gridSizeX)
-        {
-            UpdateGridColumn(updateXIndex, updateZIndex);
-            nodesProcessed++;
-
-            updateZIndex++;
-            if (updateZIndex >= gridSizeZ)
-            {
-                updateZIndex = 0;
-                updateXIndex++;
-            }
-        }
-
-        if (updateXIndex >= gridSizeX)
-        {
-            isUpdatingGrid = false;
-        }
-    }
-
-    private void UpdateGridColumn(int x, int z)
-    {
-        Vector3 horizontalPos = worldBottomLeft + Vector3.right * (x * nodeDiameter + nodeRadius) + Vector3.forward * (z * nodeDiameter + nodeRadius);
-        Vector2Int gridPos = new Vector2Int(x, z);
-
-        // Check cache first
-        float groundHeight;
-        if (!groundHeightCache.TryGetValue(gridPos, out groundHeight))
-        {
-            Vector3 rayStart = new Vector3(horizontalPos.x, transform.position.y + gridWorldSize.y, horizontalPos.z);
-            
-            if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, maxRaycastDistance, groundLayerMask))
-            {
-                groundHeight = hit.point.y;
-                groundHeightCache[gridPos] = groundHeight;
-            }
-            else
-            {
-                groundHeight = float.MinValue; // Mark as no ground
-                groundHeightCache[gridPos] = groundHeight;
-            }
-        }
-
-        // Create nodes for this column
-        if (groundHeight > float.MinValue)
-        {
-            for (int y = 0; y < gridSizeY; y++)
-            {
-                Vector3 worldPoint = new Vector3(horizontalPos.x, groundHeight + y * nodeDiameter, horizontalPos.z);
-
-                if (y * nodeDiameter <= heightAboveGround)
-                {
-                    bool walkable = !Physics.CheckSphere(worldPoint + Vector3.up * nodeRadius, nodeRadiusExpanded, unwalkableMask);
-                    grid[x, y, z] = new PathNode(walkable, worldPoint, x, y, z, true);
-                }
-                else
-                {
-                    grid[x, y, z] = new PathNode(false, worldPoint, x, y, z, false);
-                }
-            }
-        }
-        else
-        {
-            for (int y = 0; y < gridSizeY; y++)
-            {
-                Vector3 worldPoint = worldBottomLeft + Vector3.right * (x * nodeDiameter + nodeRadius) + Vector3.up * (y * nodeDiameter + nodeRadius) + Vector3.forward * (z * nodeDiameter + nodeRadius);
-                grid[x, y, z] = new PathNode(false, worldPoint, x, y, z, false);
-            }
+            CreateGrid();
+            gridUpdateTimer = 0f;
         }
     }
 
     private void CreateGrid()
     {
         grid = new PathNode[gridSizeX, gridSizeY, gridSizeZ];
-        groundHeightCache.Clear();
+        Vector3 worldBottomLeft = transform.position - Vector3.right * gridWorldSize.x / 2 - Vector3.up * gridWorldSize.y / 2 - Vector3.forward * gridWorldSize.z / 2;
 
         for (int x = 0; x < gridSizeX; x++)
         {
             for (int z = 0; z < gridSizeZ; z++)
             {
-                UpdateGridColumn(x, z);
+                // Calculate horizontal position
+                Vector3 horizontalPos = worldBottomLeft + Vector3.right * (x * nodeDiameter + nodeRadius) + Vector3.forward * (z * nodeDiameter + nodeRadius);
+
+                // Raycast down from high above to find ground
+                Vector3 rayStart = new Vector3(horizontalPos.x, transform.position.y + gridWorldSize.y, horizontalPos.z);
+                RaycastHit hit;
+
+                if (Physics.Raycast(rayStart, Vector3.down, out hit, maxRaycastDistance, groundLayerMask))
+                {
+                    // Found ground, create nodes starting from ground level
+                    Vector3 groundPoint = hit.point;
+
+                    // Create nodes from ground level upward
+                    for (int y = 0; y < gridSizeY; y++)
+                    {
+                        Vector3 worldPoint = groundPoint + Vector3.up * (y * nodeDiameter);
+
+                        // Only create nodes up to the specified height above ground
+                        if (y * nodeDiameter <= heightAboveGround)
+                        {
+                            // Check if this position is walkable (not blocked by unwalkable objects)
+                            // Use a slightly larger radius for more conservative pathfinding
+                            bool walkable = !Physics.CheckSphere(worldPoint + Vector3.up * nodeRadius, nodeRadius * 1.1f, unwalkableMask);
+                            grid[x, y, z] = new PathNode(walkable, worldPoint, x, y, z, true); // Has ground support
+                        }
+                        else
+                        {
+                            // Above the height limit, mark as unwalkable
+                            grid[x, y, z] = new PathNode(false, worldPoint, x, y, z, false); // No ground support
+                        }
+                    }
+                }
+                else
+                {
+                    // No ground found, create unwalkable nodes at grid positions
+                    for (int y = 0; y < gridSizeY; y++)
+                    {
+                        Vector3 worldPoint = worldBottomLeft + Vector3.right * (x * nodeDiameter + nodeRadius) + Vector3.up * (y * nodeDiameter + nodeRadius) + Vector3.forward * (z * nodeDiameter + nodeRadius);
+                        grid[x, y, z] = new PathNode(false, worldPoint, x, y, z, false); // No ground support
+                    }
+                }
             }
         }
     }
@@ -324,51 +249,16 @@ public class AStarPathfinder : MonoBehaviour
         int dstY = Mathf.Abs(nodeA.gridY - nodeB.gridY);
         int dstZ = Mathf.Abs(nodeA.gridZ - nodeB.gridZ);
 
-        // 3D distance calculation using optimized Chebyshev distance
-        if (dstX > dstY)
-        {
-            if (dstX > dstZ)
-            {
-                // X is largest
-                if (dstY > dstZ)
-                    return 17 * dstZ + 14 * (dstY - dstZ) + 10 * (dstX - dstY);
-                else
-                    return 17 * dstY + 14 * (dstZ - dstY) + 10 * (dstX - dstY);
-            }
-            else
-            {
-                // Z is largest
-                if (dstX > dstY)
-                    return 17 * dstY + 14 * (dstX - dstY) + 10 * (dstZ - dstX);
-                else
-                    return 17 * dstX + 14 * (dstY - dstX) + 10 * (dstZ - dstY);
-            }
-        }
-        else
-        {
-            if (dstY > dstZ)
-            {
-                // Y is largest
-                if (dstX > dstZ)
-                    return 17 * dstZ + 14 * (dstX - dstZ) + 10 * (dstY - dstX);
-                else
-                    return 17 * dstX + 14 * (dstZ - dstX) + 10 * (dstY - dstZ);
-            }
-            else
-            {
-                // Z is largest
-                return 17 * dstX + 14 * (dstY - dstX) + 10 * (dstZ - dstY);
-            }
-        }
+        // 3D distance calculation using Chebyshev distance approximation
+        int[] distances = { dstX, dstY, dstZ };
+        System.Array.Sort(distances);
+
+        return 17 * distances[0] + 14 * (distances[1] - distances[0]) + 10 * (distances[2] - distances[1]);
     }
 
     private List<PathNode> GetNeighbors(PathNode node)
     {
-        List<PathNode> neighbors = new List<PathNode>(26);
-
-        int nodeX = node.gridX;
-        int nodeY = node.gridY;
-        int nodeZ = node.gridZ;
+        List<PathNode> neighbors = new List<PathNode>(26); // Pre-allocate capacity
 
         for (int x = -1; x <= 1; x++)
         {
@@ -379,24 +269,26 @@ public class AStarPathfinder : MonoBehaviour
                     if (x == 0 && y == 0 && z == 0)
                         continue;
 
-                    int checkX = nodeX + x;
-                    int checkY = nodeY + y;
-                    int checkZ = nodeZ + z;
+                    int checkX = node.gridX + x;
+                    int checkY = node.gridY + y;
+                    int checkZ = node.gridZ + z;
 
                     if (checkX >= 0 && checkX < gridSizeX && checkY >= 0 && checkY < gridSizeY && checkZ >= 0 && checkZ < gridSizeZ)
                     {
                         PathNode neighbor = grid[checkX, checkY, checkZ];
 
                         // Skip diagonal movement if it would cut through walls
-                        if ((x != 0 && z != 0) || (x != 0 && y != 0) || (y != 0 && z != 0))
+                        bool isDiagonal = (x != 0 && z != 0) || (x != 0 && y != 0) || (y != 0 && z != 0);
+
+                        if (isDiagonal)
                         {
                             // Check if axis-aligned neighbors are walkable (prevent corner cutting)
-                            if ((x != 0 && !grid[nodeX + x, nodeY, nodeZ].walkable) ||
-                                (y != 0 && !grid[nodeX, nodeY + y, nodeZ].walkable) ||
-                                (z != 0 && !grid[nodeX, nodeY, nodeZ + z].walkable))
-                            {
-                                continue;
-                            }
+                            bool xBlocked = x != 0 && !grid[node.gridX + x, node.gridY, node.gridZ].walkable;
+                            bool yBlocked = y != 0 && !grid[node.gridX, node.gridY + y, node.gridZ].walkable;
+                            bool zBlocked = z != 0 && !grid[node.gridX, node.gridY, node.gridZ + z].walkable;
+
+                            if (xBlocked || yBlocked || zBlocked)
+                                continue; // Skip this diagonal neighbor
                         }
 
                         neighbors.Add(neighbor);
@@ -410,11 +302,15 @@ public class AStarPathfinder : MonoBehaviour
 
     private PathNode NodeFromWorldPoint(Vector3 worldPosition)
     {
+        Vector3 worldBottomLeft = transform.position - Vector3.right * gridWorldSize.x / 2 - Vector3.up * gridWorldSize.y / 2 - Vector3.forward * gridWorldSize.z / 2;
         Vector3 relativePos = worldPosition - worldBottomLeft;
 
-        float percentX = Mathf.Clamp01(relativePos.x / gridWorldSize.x);
-        float percentY = Mathf.Clamp01(relativePos.y / gridWorldSize.y);
-        float percentZ = Mathf.Clamp01(relativePos.z / gridWorldSize.z);
+        float percentX = relativePos.x / gridWorldSize.x;
+        float percentY = relativePos.y / gridWorldSize.y;
+        float percentZ = relativePos.z / gridWorldSize.z;
+        percentX = Mathf.Clamp01(percentX);
+        percentY = Mathf.Clamp01(percentY);
+        percentZ = Mathf.Clamp01(percentZ);
 
         int x = Mathf.RoundToInt((gridSizeX - 1) * percentX);
         int y = Mathf.RoundToInt((gridSizeY - 1) * percentY);
@@ -428,6 +324,8 @@ public class AStarPathfinder : MonoBehaviour
         return null;
     }
 
+
+
     private void OnDrawGizmos()
     {
         Gizmos.DrawWireCube(transform.position, gridWorldSize);
@@ -436,7 +334,7 @@ public class AStarPathfinder : MonoBehaviour
         {
             foreach (PathNode node in grid)
             {
-                if (node == null || !node.hasGroundSupport) continue;
+                if (node == null || !node.hasGroundSupport) continue; // Skip nodes without ground support
 
                 Gizmos.color = node.walkable ? new Color(1f, 1f, 1f, gridAlpha) : new Color(1f, 0f, 0f, redGridAlpha);
                 Gizmos.DrawCube(node.worldPosition, Vector3.one * (nodeDiameter - 0.1f));
@@ -444,7 +342,10 @@ public class AStarPathfinder : MonoBehaviour
         }
     }
 
+
     [ContextMenu("Regenerate Grid")]
+
+    // Manual grid refresh method
     public void RefreshGrid()
     {
         CreateGrid();
@@ -476,6 +377,8 @@ public class PathNodeComparer : IComparer<PathNode>
         }
         return compare;
     }
+
+
 }
 
 public class PathNode
@@ -485,7 +388,7 @@ public class PathNode
     public int gridX;
     public int gridY;
     public int gridZ;
-    public bool hasGroundSupport;
+    public bool hasGroundSupport; // Tracks if this node is above actual ground
 
     public int gCost;
     public int hCost;
@@ -505,4 +408,5 @@ public class PathNode
     {
         get { return gCost + hCost; }
     }
+
 }
