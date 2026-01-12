@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 6952fb4f7de6e6f4fab27d95bd146c6a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/AssetPathUtils.cs
+  uploadId: 836002

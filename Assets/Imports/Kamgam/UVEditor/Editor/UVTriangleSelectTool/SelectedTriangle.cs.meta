@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: a51c0d68fcc9e0444bf7db85c94ee486
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVTriangleSelectTool/SelectedTriangle.cs
+  uploadId: 836002

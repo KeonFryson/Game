@@ -2,7 +2,7 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
-    public Camera playerCamera;
+    public GameObject playerCamera;
     public float walkSpeedDefault = 5f;
     public float runSpeedDefault = 10f;
     private float walkSpeed;
@@ -43,6 +43,8 @@ public class PlayerMovement : MonoBehaviour
     {
         walkSpeed = walkSpeedDefault;
         runSpeed = runSpeedDefault;
+
+        playerCamera = GameObject.FindWithTag("MainCamera");
 
         inputActions = new InputSystem_Actions();
         playerActions = inputActions.Player;
@@ -92,6 +94,8 @@ public class PlayerMovement : MonoBehaviour
 
 
     }
+
+
 
     void Update()
     {
@@ -166,5 +170,10 @@ public class PlayerMovement : MonoBehaviour
         // Ensure camera is not null and apply pitch locally
         if (playerCamera != null)
             playerCamera.transform.localRotation = Quaternion.Euler(rotationX, 0f, 0f);
+    }
+
+    public void SetCamera(GameObject camera)
+    {
+       playerCamera = camera;
     }
 }

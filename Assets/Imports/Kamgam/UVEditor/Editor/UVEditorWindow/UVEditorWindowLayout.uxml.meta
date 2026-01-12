@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 360f9024d3c94254fb02a7fae285a5b0
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 13804, guid: 0000000000000000e000000000000000, type: 0}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVEditorWindow/UVEditorWindowLayout.uxml
+  uploadId: 836002

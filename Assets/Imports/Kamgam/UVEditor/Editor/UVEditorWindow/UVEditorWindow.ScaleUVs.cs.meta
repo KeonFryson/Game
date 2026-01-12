@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 962e56af12e7e3f40946a59c26e3fa69
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVEditorWindow/UVEditorWindow.ScaleUVs.cs
+  uploadId: 836002

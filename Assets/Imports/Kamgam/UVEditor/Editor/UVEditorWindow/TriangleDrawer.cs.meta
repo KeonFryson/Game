@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3aa028e91ef69674691a96b6ded1e6a6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVEditorWindow/TriangleDrawer.cs
+  uploadId: 836002

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 41b984eb0477a5143a320fc69b37420f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVEditorWindow/UVEditorWindow.UndoRedo.cs
+  uploadId: 836002

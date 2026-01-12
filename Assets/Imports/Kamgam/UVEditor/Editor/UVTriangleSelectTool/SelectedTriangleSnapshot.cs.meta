@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 10d72b140d0b50c428d42f5aa9efd034
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVTriangleSelectTool/SelectedTriangleSnapshot.cs
+  uploadId: 836002

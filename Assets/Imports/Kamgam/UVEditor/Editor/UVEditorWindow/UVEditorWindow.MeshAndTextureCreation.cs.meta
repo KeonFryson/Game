@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: e209796100a0a1246869f7d3271fbc63
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVEditorWindow/UVEditorWindow.MeshAndTextureCreation.cs
+  uploadId: 836002

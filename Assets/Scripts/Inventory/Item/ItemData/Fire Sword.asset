@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de2b04b7e977617438e7b53522eb031d, type: 3}
   m_Name: Fire Sword
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: Fire Sword
-  itemID: 1
+  itemName: FireBall
+  itemID: 0
   itemDescription: 
   maxStackSize: 1
-  itemIcon: {fileID: 21300000, guid: 5e88dda11c7754b41b782532576047f0, type: 3}
-  itemPrefab: {fileID: 4472452814026660851, guid: 2e18e4d643776014e955d5c69357030e, type: 3}
+  itemIcon: {fileID: 21300000, guid: 160b197aba549514286b94426ceae589, type: 3}
+  itemPrefab: {fileID: 1331778228688492785, guid: 2a8da5b6361aa8344858ca059fe36b69, type: 3}
   damage: 25
   healingAmount: 0

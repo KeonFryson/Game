@@ -5,14 +5,14 @@ public class ItemPickup : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public ItemData item;
     private Inventroy Inventroy;
-    public CircleCollider2D pickupTrigger;
+    public SphereCollider pickupTrigger;
     public GameObject player;
     private bool hasBeenPickedUp = false;
 
     private void Awake()
     {
         Inventroy = FindFirstObjectByType<Inventroy>();
-        pickupTrigger = GetComponent<CircleCollider2D>();
+        pickupTrigger = GetComponent<SphereCollider>();
         player = GameObject.FindWithTag("Player");
 
         if (player != null && transform.IsChildOf(player.transform))
@@ -22,14 +22,17 @@ public class ItemPickup : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter2D(Collider2D collision)
+
+
+    private void OnTriggerEnter(Collider other)
     {
-        if (collision.CompareTag("Player") && !hasBeenPickedUp)
+        if (other.CompareTag("Player") && !hasBeenPickedUp)
         {
             PickUpItem();
         }
     }
 
+     
 
     private void PickUpItem()
     {

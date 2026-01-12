@@ -92,6 +92,7 @@ public class InventoryManger : MonoBehaviour
         }
     }
 
+
     private void OnDropItem(InputAction.CallbackContext context)
     {
         if (inventory == null || inventory.inventory == null || inventory.inventory.Count == 0)
@@ -104,26 +105,15 @@ public class InventoryManger : MonoBehaviour
 
             if (itemToDrop != null && itemToDrop.item != null && itemToDrop.item.itemPrefab != null)
             {
-                // Get mouse position and calculate direction
-                if (Mouse.current != null && UnityEngine.Camera.main != null)
-                {
-                    Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
-                    Vector3 mouseWorldPos = UnityEngine.Camera.main.ScreenToWorldPoint(mouseScreenPos);
-                    mouseWorldPos.z = 0f;
+                // Drop the item 2 units in front of the player
+                Vector3 dropPosition = playerController.transform.position + playerController.transform.forward;
 
-                    // Calculate direction from player to mouse
-                    Vector2 dropDirection = (mouseWorldPos - playerController.transform.position).normalized;
+                GameObject droppedItem = Instantiate(itemToDrop.item.itemPrefab, dropPosition, itemToDrop.item.itemPrefab.transform.rotation);
 
-                    // Drop the item 2 units in the mouse direction
-                    Vector3 dropPosition = playerController.transform.position + (Vector3)(dropDirection * 2f);
+                Debug.Log("Dropped: " + itemToDrop.item.itemName);
 
-                    GameObject droppedItem = Instantiate(itemToDrop.item.itemPrefab, dropPosition, itemToDrop.item.itemPrefab.transform.rotation);
-
-                    Debug.Log("Dropped: " + itemToDrop.item.itemName);
-
-                    // Remove the item from inventory
-                    inventory.Remove(itemToDrop.item);
-                }
+                // Remove the item from inventory
+                inventory.Remove(itemToDrop.item);
             }
         }
     }

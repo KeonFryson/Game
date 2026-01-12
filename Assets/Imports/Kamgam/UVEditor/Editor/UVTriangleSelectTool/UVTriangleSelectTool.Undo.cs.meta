@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 663a8cfcdc6f761408d8e3b85d2ff95b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 294033
+  packageName: UV Editor & Texture Editor
+  packageVersion: 2.0.8
+  assetPath: Assets/Kamgam/UVEditor/Editor/UVTriangleSelectTool/UVTriangleSelectTool.Undo.cs
+  uploadId: 836002

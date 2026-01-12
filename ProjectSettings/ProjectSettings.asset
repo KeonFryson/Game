@@ -825,7 +825,23 @@ PlayerSettings:
   webGLCloseOnQuit: 0
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
-  scriptingDefineSymbols: {}
+  scriptingDefineSymbols:
+    Android: KAMGAM_UV_EDITOR
+    EmbeddedLinux: KAMGAM_UV_EDITOR
+    GameCoreScarlett: KAMGAM_UV_EDITOR
+    GameCoreXboxOne: KAMGAM_UV_EDITOR
+    Kepler: KAMGAM_UV_EDITOR
+    LinuxHeadlessSimulation: KAMGAM_UV_EDITOR
+    Nintendo Switch: KAMGAM_UV_EDITOR
+    Nintendo Switch 2: KAMGAM_UV_EDITOR
+    PS4: KAMGAM_UV_EDITOR
+    PS5: KAMGAM_UV_EDITOR
+    QNX: KAMGAM_UV_EDITOR
+    Standalone: KAMGAM_UV_EDITOR
+    VisionOS: KAMGAM_UV_EDITOR
+    WebGL: KAMGAM_UV_EDITOR
+    XboxOne: KAMGAM_UV_EDITOR
+    tvOS: KAMGAM_UV_EDITOR
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
