@@ -503,9 +503,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd9fc29061b842846ab2c033a4bfa71d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Maze
-  Cube: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
+  floor: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
+  wall: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
+  path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
   width: 10
-  height: -1
+  height: 10
   depth: 10
 --- !u!1 &2052849559
 GameObject:
