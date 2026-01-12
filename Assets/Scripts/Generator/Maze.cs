@@ -66,7 +66,7 @@ public class Maze : MonoBehaviour
                 for (int z = 0; z < d; z++)
                 {
                     Vector3 position = new Vector3(x, y, z);
-                    if (mazeData[x, y, z] == 1)
+                    if (mazeData[x, y, z] == 0)
                     {
                         Instantiate(Cube, position, Quaternion.identity);
                     }
