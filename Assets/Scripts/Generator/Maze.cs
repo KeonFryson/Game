@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class Maze : MonoBehaviour
@@ -77,24 +78,24 @@ public class Maze : MonoBehaviour
                 for (int z = 0; z < d; z++)
                 {
                     Vector3 position = new Vector3(x, y, z);
-                    if (mazeData[x, y, z] == 0)
+
+                    if (mazeData[x, y, z] == 0) // Floor
                     {
-                        if (mazeData[x, y, z] == 0)  // Floor
-                        {
-                            //position.y -= 1;  // Subtract 1 from y
-                            Instantiate(floor, position, Quaternion.identity);
-                        }
-                        //Instantiate(floor, floorPosition, Quaternion.identity);
+                         //position.y -= 1;  // Subtract 1 from y
+                         Instantiate(floor, position, Quaternion.identity);
+   
                     }
-                    else if (mazeData[x, y, z] == 1)
+                    else if (mazeData[x, y, z] == 1)// Wall
                     {
-                        // Optionally instantiate walls or other objects
+                        // instantiate walls or other objects
                         Instantiate(wall, position, Quaternion.identity);
                     }
-                    else if (mazeData[x, y, z] == 2)
+                    else if (mazeData[x, y, z] == 2)// Path
                     {
-                        // Optionally instantiate paths or other objects
-                        Instantiate(path, position, Quaternion.identity);
+                        // instantiate paths or other objects
+                        // this should have nothing in it so we can see the floor
+                        // or a vent or something  that needs emptie space 
+                       // Instantiate(path, position, Quaternion.identity);
                     }
                 }
             }

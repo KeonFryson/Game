@@ -298,11 +298,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3346899877856138935, guid: 3c61a6289fb64d94988d081412fad990, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.99
+      value: 10.8
       objectReference: {fileID: 0}
     - target: {fileID: 3346899877856138935, guid: 3c61a6289fb64d94988d081412fad990, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.18195
+      value: 4.33
       objectReference: {fileID: 0}
     - target: {fileID: 3346899877856138935, guid: 3c61a6289fb64d94988d081412fad990, type: 3}
       propertyPath: m_LocalRotation.w
@@ -394,7 +394,7 @@ MonoBehaviour:
   wall: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
   path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
   width: 20
-  height: 1
+  height: 2
   depth: 20
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

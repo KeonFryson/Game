@@ -394,7 +394,7 @@ MonoBehaviour:
   wall: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
   path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
   width: 20
-  height: 1
+  height: 2
   depth: 20
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
