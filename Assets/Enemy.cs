@@ -39,6 +39,7 @@ public abstract class Enemy : MonoBehaviour
 
     [Header("AI Settings")]
     [SerializeField] protected bool isAIEnabled = true;
+    [SerializeField] protected float playerLostTimeout = 60f; // Time before giving up on last known position
 
     [Header("References")]
     [SerializeField] protected Transform detectionTransform;
@@ -48,8 +49,14 @@ public abstract class Enemy : MonoBehaviour
     protected bool playerInPursuitMode;
     protected Vector3 lastKnownPlayerPosition;
     protected bool hasLastKnownPosition;
+    protected float timeSincePlayerSeen; // Timer tracking how long since player was last seen
     protected Animator animator;
     protected bool isDead;
+
+    // Cached values for optimization
+    private float detectionRangeSqr;
+    private float waypointReachedDistanceSqr;
+    private float cosDetectionAngle;
 
     protected virtual void Awake()
     {
@@ -64,6 +71,11 @@ public abstract class Enemy : MonoBehaviour
             obj.transform.localPosition = Vector3.zero;
             detectionTransform = obj.transform;
         }
+
+        // Cache squared distances to avoid expensive sqrt operations
+        detectionRangeSqr = detectionRange * detectionRange;
+        waypointReachedDistanceSqr = waypointReachedDistance * waypointReachedDistance;
+        cosDetectionAngle = Mathf.Cos(detectionAngle * Mathf.Deg2Rad);
     }
 
     protected virtual void Start()
@@ -88,10 +100,25 @@ public abstract class Enemy : MonoBehaviour
             playerInPursuitMode = true;
             lastKnownPlayerPosition = player.position;
             hasLastKnownPosition = true;
+            timeSincePlayerSeen = 0f; // Reset timer when player is seen
         }
         else if (playerInPursuitMode)
         {
             playerInPursuitMode = false;
+        }
+
+        // Increment timer when player is not detected
+        if (!playerDetected && hasLastKnownPosition)
+        {
+            timeSincePlayerSeen += Time.deltaTime;
+
+            // After timeout, give up on last known position and return to random walking
+            if (timeSincePlayerSeen >= playerLostTimeout)
+            {
+                hasLastKnownPosition = false;
+                timeSincePlayerSeen = 0f;
+                SetNewRandomWalkTarget(); // Start new random walk immediately
+            }
         }
 
         if (usePathfinding && AStarPathfinder.Instance != null)
@@ -130,15 +157,23 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual bool IsPlayerInDetectionCone()
     {
+        // Calculate direction and squared distance in one operation
         Vector3 direction = player.position - transform.position;
-        float distance = direction.magnitude;
+        float distanceSqr = direction.sqrMagnitude;
 
-        if (distance > detectionRange) return false;
+        // Early exit: check squared distance first (no sqrt needed)
+        if (distanceSqr > detectionRangeSqr) return false;
 
-        float angle = Vector3.Angle(detectionTransform.forward, direction);
-        if (angle > detectionAngle) return false;
+        // Normalize direction only once for both angle check and raycast
+        float distance = Mathf.Sqrt(distanceSqr);
+        direction /= distance; // Manual normalization using already calculated magnitude
 
-        if (Physics.Raycast(transform.position, direction.normalized, distance, obstacleLayers))
+        // Use dot product instead of Vector3.Angle (more efficient)
+        float dot = Vector3.Dot(detectionTransform.forward, direction);
+        if (dot < cosDetectionAngle) return false;
+
+        // Final raycast check (most expensive, so done last)
+        if (Physics.Raycast(transform.position, direction, distance, obstacleLayers))
             return false;
 
         return true;
@@ -148,15 +183,27 @@ public abstract class Enemy : MonoBehaviour
     {
         if (speed < 0) speed = moveSpeed;
 
-        Vector3 direction = (target - transform.position).normalized;
+        // Calculate direction once
+        Vector3 direction = target - transform.position;
+
+        // Check for zero direction early
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            rb.linearVelocity = Vector3.zero;
+            return;
+        }
+
+        // Normalize for movement
+        direction.Normalize();
         rb.linearVelocity = direction * speed;
 
-        if (direction != Vector3.zero)
-        {
-            // Flatten direction to only rotate on Y axis (horizontal rotation only)
-            direction.y = 0f;
-            direction.Normalize();
+        // Flatten direction for rotation (reuse the same vector)
+        direction.y = 0f;
 
+        // Only rotate if we have a valid horizontal direction
+        if (direction.sqrMagnitude > 0.001f)
+        {
+            direction.Normalize();
             Quaternion lookRot = Quaternion.LookRotation(direction);
             transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotationSpeed * Time.fixedDeltaTime);
         }
@@ -174,9 +221,11 @@ public abstract class Enemy : MonoBehaviour
         }
 
         Vector3 target = currentPath[currentWaypointIndex];
-        float dist = Vector3.Distance(transform.position, target);
 
-        if (dist <= waypointReachedDistance)
+        // Use squared distance for comparison
+        float distSqr = (transform.position - target).sqrMagnitude;
+
+        if (distSqr <= waypointReachedDistanceSqr)
         {
             currentWaypointIndex++;
 
@@ -189,9 +238,23 @@ public abstract class Enemy : MonoBehaviour
 
             // Update target to the new waypoint
             target = currentPath[currentWaypointIndex];
+            distSqr = (transform.position - target).sqrMagnitude;
         }
 
-        MoveTowardsPosition(target);
+        // Look ahead to the next waypoint for smoother movement
+        Vector3 moveTarget = target;
+        if (currentWaypointIndex < currentPath.Count - 1)
+        {
+            Vector3 nextWaypoint = currentPath[currentWaypointIndex + 1];
+
+            // If we're close to current waypoint, blend toward the next one
+            if (distSqr <= waypointReachedDistanceSqr * 4f)
+            {
+                moveTarget = Vector3.Lerp(target, nextWaypoint, 0.5f);
+            }
+        }
+
+        MoveTowardsPosition(moveTarget);
     }
 
     protected virtual void FallbackMovement()
@@ -216,7 +279,8 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual void UpdateRandomWalk()
     {
-        if (Vector3.Distance(transform.position, randomWalkTarget) <= waypointReachedDistance)
+        // Use squared distance for comparison
+        if ((transform.position - randomWalkTarget).sqrMagnitude <= waypointReachedDistanceSqr)
         {
             isWalking = false;
             idleTimer = Random.Range(idleTimeMin, idleTimeMax);
@@ -251,8 +315,20 @@ public abstract class Enemy : MonoBehaviour
 
         if (AStarPathfinder.Instance != null)
         {
-            currentPath = AStarPathfinder.Instance.FindPath(transform.position, target);
-            currentWaypointIndex = 0;
+            List<Vector3> newPath = AStarPathfinder.Instance.FindPath(transform.position, target);
+
+            // Only update path if we got a valid result
+            if (newPath != null && newPath.Count > 0)
+            {
+                currentPath = newPath;
+                currentWaypointIndex = 0;
+            }
+            else if (playerDetected)
+            {
+                // If pathfinding failed but player is detected, clear last known position
+                // to fall back to direct movement
+                hasLastKnownPosition = false;
+            }
         }
     }
 
