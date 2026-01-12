@@ -10,7 +10,7 @@ public class Maze : MonoBehaviour
     public int width = 10;
     public int height = 10;
     public int depth = 10;
-    private int[,,] mazeData;
+    public int[,,] mazeData;
     
     void Start()
     {
@@ -34,7 +34,7 @@ public class Maze : MonoBehaviour
                     mazeData[x, y, z] = 0;  // All floors by default
     }
 
-    void GenerateMazeData()
+    public virtual void GenerateMazeData()
     {
         int w = width;
         int h = height;
@@ -81,7 +81,7 @@ public class Maze : MonoBehaviour
                     {
                         if (mazeData[x, y, z] == 0)  // Floor
                         {
-                            position.y -= 1;  // Subtract 1 from y
+                            //position.y -= 1;  // Subtract 1 from y
                             Instantiate(floor, position, Quaternion.identity);
                         }
                         //Instantiate(floor, floorPosition, Quaternion.identity);
