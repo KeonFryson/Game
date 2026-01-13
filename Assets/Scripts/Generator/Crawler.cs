@@ -6,6 +6,14 @@ public class Crawler : Maze
 {
     public override void GenerateMazeData()
     {
+
+        SetWall();
+        SetFloor();
+        MaveRunner();
+    }
+
+    void SetWall()
+    {
         // First loop: Fill everything with walls
         for (int i = 0; i < width; i++)
         {
@@ -17,7 +25,10 @@ public class Crawler : Maze
                 }
             }
         }
+    }
 
+    void SetFloor()
+    {
         // Second loop: Set the floor at y = 0
         for (int i = 0; i < width; i++)
         {
@@ -27,6 +38,18 @@ public class Crawler : Maze
             }
         }
 
+    }
+    void SetRoom()
+    {
+        // this cuntion will create a room in the maze or rooms 
+
+    }
+    void PlayerStaingRoom()
+    {
+        // this function will set the player start position 
+    }
+    void MaveRunner()
+    {
         bool done = false;
         Vector3Int[] direction = new Vector3Int[]
         {
@@ -37,9 +60,10 @@ public class Crawler : Maze
             new Vector3Int(0,0,1),  //forward
             new Vector3Int(0,0,-1)  //back
         };
+
         // Initialize starting position at the center, just above the floor
         int x = width / 2;
-        int y = height-1; // Start at y=1 (just above the floor at y=0)
+        int y = height - 1; // Start at y=1 (just above the floor at y=0)
         int z = depth / 2;
 
         Debug.Log($"Starting crawler at position: ({x}, {y}, {z})");
@@ -49,7 +73,7 @@ public class Crawler : Maze
 
             mazeData[x, y, z] = 2; // Mark current position as path
 
-            Debug.Log($"Crawler at: ({x}, {y}, {z})");  // Add this line
+            Debug.Log($"Crawler at: ({x}, {y}, {z})");
             Vector3Int move = direction[Random.Range(0, direction.Length)];
 
             // Update position
@@ -61,7 +85,7 @@ public class Crawler : Maze
 
             //complete when we hit a edge or are out of bounds  not the floor
             //done = (newX <= 0 || newX >= width - 1 || newY < 1 || newY >= height || newZ <= 0 || newZ >= depth - 1);
-            done = (newX <= 0 || newX >= width - 1 || newZ <= 0 || newZ >= depth - 1);
+            done = (newX < 0 || newX >= width - 1 || newZ < 0 || newZ >= depth - 1);
 
             // Only move if within bounds
             if (!done)
@@ -69,6 +93,11 @@ public class Crawler : Maze
                 x = newX;
                 // y = newY;
                 z = newZ;
+            }
+            else
+            {
+                mazeData[x, y, z] = 2; // Mark current position as path
+                Debug.Log("Crawler reached the edge or out of bounds.");
             }
         }
         Debug.Log("Crawler finished = " + done);
