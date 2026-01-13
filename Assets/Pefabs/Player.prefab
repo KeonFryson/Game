@@ -198,6 +198,7 @@ GameObject:
   - component: {fileID: 1852535590293060277}
   - component: {fileID: 5614739472049534797}
   - component: {fileID: 926071172083018223}
+  - component: {fileID: 446497820786172016}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -367,6 +368,27 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &446497820786172016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863249750371512420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6bc69ab2ac4fc6941bfd9ba0b0cdea2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpellCastingManager
+  inventoryManager: {fileID: 0}
+  inventory: {fileID: 983732182316531108}
+  spellCastPoint: {fileID: 8583726594308006621}
+  playerMovement: {fileID: 0}
+  maxMana: 100
+  manaRegenRate: 5
+  globalCooldownTime: 0.5
+  canMoveWhileChanneling: 1
+  showChannelEffect: 1
 --- !u!1 &7062883894433770727
 GameObject:
   m_ObjectHideFlags: 0
