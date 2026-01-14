@@ -356,8 +356,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1854519772}
   - component: {fileID: 1854519773}
-  - component: {fileID: 1854519774}
-  - component: {fileID: 1854519775}
   m_Layer: 0
   m_Name: Generator
   m_TagString: Untagged
@@ -397,42 +395,6 @@ MonoBehaviour:
   path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
   width: 20
   height: 2
-  depth: 20
---- !u!114 &1854519774
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba399d2b27e18284eb5e8d5815aaee0f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GreenField
-  floor: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
-  wall: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
-  path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
-  width: 20
-  height: 10
-  depth: 20
---- !u!114 &1854519775
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 87e2e9b9b29b5034da39d56908a5453d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UrbanPlanner
-  floor: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
-  wall: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
-  path: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
-  width: 20
-  height: 10
   depth: 20
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
