@@ -4913,7 +4913,7 @@ MonoBehaviour:
   lifetime: 5
   useGravity: 0
   baseDamage: 10
-  isHoming: 0
+  isHoming: 1
   homingStrength: 5
   target: {fileID: 0}
 --- !u!54 &7393843663624192961

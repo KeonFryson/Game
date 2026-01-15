@@ -25,7 +25,7 @@ MonoBehaviour:
   isSpell: 1
   manaCost: 10
   spellChannelTime: 1
-  spellCooldown: 5
+  spellCooldown: 10
   spellSpeed: 20
   spellEffectPrefab: {fileID: 8585012160248123855, guid: a288be1acf0830946bb60a77ff160182, type: 3}
   channelScaleCurve:
@@ -52,3 +52,5 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  spellCastPointOffset: {x: 0, y: 0, z: 0}
+  customSpellCastPoint: {fileID: 0}

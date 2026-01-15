@@ -33,8 +33,8 @@ public abstract class Enemy : MonoBehaviour
     protected float idleTimer;
 
     [Header("Health Settings")]
-    [SerializeField] protected int maxHealth = 100;
-    protected int currentHealth;
+    [SerializeField] protected float maxHealth = 100;
+    protected float currentHealth;
     [SerializeField] protected float deathAnimationDuration = 1f;
 
     [Header("AI Settings")]
@@ -332,7 +332,7 @@ public abstract class Enemy : MonoBehaviour
         }
     }
 
-    public virtual void TakeDamage(int damage)
+    public virtual void TakeDamage(float damage)
     {
         if (isDead) return;
 

@@ -114,9 +114,10 @@ public class SpellProjectile : MonoBehaviour
         // Handle collision (damage, effects, etc.)
         float finalDamage = GetDamage();
         Debug.Log($"Spell hit: {collision.gameObject.name} for {finalDamage:F1} damage ({damageMultiplier * 100f:F0}% power)");
+ 
+        collision.gameObject.GetComponent<Enemy>()?.TakeDamage(finalDamage);
 
-        // TODO: Apply damage to target if it has a health component
-        // Example: collision.gameObject.GetComponent<Health>()?.TakeDamage(finalDamage);
+
 
         // Destroy the projectile on impact
         Destroy(gameObject);

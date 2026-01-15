@@ -30,9 +30,13 @@ public class ItemData : ScriptableObject
     [ConditionalHide("isSpell", true)]
     [SerializeField] public float spellCooldown;
     [ConditionalHide("isSpell", true)]
-    [SerializeField] public float spellSpeed = 10f; // NEW: Projectile speed
+    [SerializeField] public float spellSpeed = 10f;
     [ConditionalHide("isSpell", true)]
     [SerializeField] public GameObject spellEffectPrefab;
     [ConditionalHide("isSpell", true)]
     [SerializeField] public AnimationCurve channelScaleCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [ConditionalHide("isSpell", true)]
+    [SerializeField] public Vector3 spellCastPointOffset = Vector3.zero; // Offset from default cast point
+    [ConditionalHide("isSpell", true)]
+    [SerializeField] public Transform customSpellCastPoint = null; // Optional: Override cast point entirely
 }

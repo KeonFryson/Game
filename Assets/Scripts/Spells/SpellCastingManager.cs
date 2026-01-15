@@ -72,7 +72,7 @@ public class SpellCastingManager : MonoBehaviour
 
         if (spellCastPoint == null)
         {
-            spellCastPoint = transform;
+            spellCastPoint = GameObject.Find("SpellPoint").transform;
         }
 
         inputActions = new InputSystem_Actions();
@@ -150,6 +150,8 @@ public class SpellCastingManager : MonoBehaviour
         channelTimer += Time.deltaTime;
         float progress = Mathf.Clamp01(channelTimer / channelingSpell.spellChannelTime);
 
+        Transform currentCastPoint = GetSpellCastPoint(channelingSpell);
+
         if (channelEffectInstance != null)
         {
             if (channelingSpell.channelScaleCurve != null)
@@ -158,8 +160,8 @@ public class SpellCastingManager : MonoBehaviour
                 channelEffectInstance.transform.localScale = originalEffectScale * scaleMultiplier;
             }
 
-            channelEffectInstance.transform.position = spellCastPoint.position;
-            channelEffectInstance.transform.rotation = spellCastPoint.rotation;
+            channelEffectInstance.transform.position = currentCastPoint.position;
+            channelEffectInstance.transform.rotation = currentCastPoint.rotation;
         }
 
         if (chargeEffectInstance != null)
@@ -190,6 +192,30 @@ public class SpellCastingManager : MonoBehaviour
             currentMana = Mathf.Min(currentMana + Mathf.RoundToInt(manaRegenRate * Time.deltaTime), maxMana);
             OnManaChanged?.Invoke(currentMana, maxMana);
         }
+    }
+
+    // NEW: Get the appropriate cast point for a specific spell
+    private Transform GetSpellCastPoint(ItemData spell)
+    {
+        if (spell.customSpellCastPoint != null)
+        {
+            return spell.customSpellCastPoint;
+        }
+        return spellCastPoint;
+    }
+
+    // NEW: Get the spawn position with offset applied
+    private Vector3 GetSpellSpawnPosition(ItemData spell)
+    {
+        Transform castPoint = GetSpellCastPoint(spell);
+        return castPoint.position + castPoint.TransformDirection(spell.spellCastPointOffset);
+    }
+
+    // NEW: Get the spawn rotation
+    private Quaternion GetSpellSpawnRotation(ItemData spell)
+    {
+        Transform castPoint = GetSpellCastPoint(spell);
+        return castPoint.rotation;
     }
 
     public bool TryStartCastSpell()
@@ -248,21 +274,26 @@ public class SpellCastingManager : MonoBehaviour
             playerMovement.enabled = false;
         }
 
+        Vector3 spawnPosition = GetSpellSpawnPosition(spell);
+        Quaternion spawnRotation = GetSpellSpawnRotation(spell);
+
         if (showChannelEffect && spell.spellEffectPrefab != null)
         {
-            channelEffectInstance = Instantiate(spell.spellEffectPrefab, spellCastPoint.position, spellCastPoint.rotation);
+            channelEffectInstance = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
 
             originalEffectScale = spell.spellEffectPrefab.transform.localScale;
 
             channelEffectInstance.transform.localScale = Vector3.zero;
 
-            channelEffectInstance.transform.SetParent(spellCastPoint);
+            Transform castPoint = GetSpellCastPoint(spell);
+            channelEffectInstance.transform.SetParent(castPoint);
         }
 
         if (chargeEffectPrefab != null)
         {
-            chargeEffectInstance = Instantiate(chargeEffectPrefab, spellCastPoint.position, Quaternion.identity);
-            chargeEffectInstance.transform.SetParent(spellCastPoint);
+            chargeEffectInstance = Instantiate(chargeEffectPrefab, spawnPosition, Quaternion.identity);
+            Transform castPoint = GetSpellCastPoint(spell);
+            chargeEffectInstance.transform.SetParent(castPoint);
         }
 
         OnSpellChannelStart?.Invoke(spell, 0f);
@@ -320,10 +351,11 @@ public class SpellCastingManager : MonoBehaviour
 
             channelEffectInstance.transform.localScale = originalEffectScale;
 
+            Transform castPoint = GetSpellCastPoint(spell);
             SpellProjectile projectile = channelEffectInstance.GetComponent<SpellProjectile>();
             if (projectile != null)
             {
-                projectile.Initialize(spellCastPoint.forward, spell.spellSpeed, spell.spellChannelTime, channelPercent);
+                projectile.Initialize(castPoint.forward, spell.spellSpeed, spell.spellChannelTime, channelPercent);
             }
             else
             {
@@ -447,17 +479,18 @@ public class SpellCastingManager : MonoBehaviour
         Debug.Log($"Casting spell: {spell.itemName}");
         if (spell.spellEffectPrefab != null)
         {
-            Vector3 spawnPosition = spellCastPoint.position;
-            Quaternion spawnRotation = spellCastPoint.rotation;
+            Vector3 spawnPosition = GetSpellSpawnPosition(spell);
+            Quaternion spawnRotation = GetSpellSpawnRotation(spell);
 
             GameObject spellEffect = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
 
             spellEffect.transform.localScale = spell.spellEffectPrefab.transform.localScale;
 
+            Transform castPoint = GetSpellCastPoint(spell);
             SpellProjectile projectile = spellEffect.GetComponent<SpellProjectile>();
             if (projectile != null)
             {
-                projectile.Initialize(spellCastPoint.forward, spell.spellSpeed, spell.spellChannelTime, 1f);
+                projectile.Initialize(castPoint.forward, spell.spellSpeed, spell.spellChannelTime, 1f);
             }
             else
             {
@@ -524,5 +557,10 @@ public class SpellCastingManager : MonoBehaviour
         maxMana = newMaxMana;
         currentMana = Mathf.Min(currentMana, maxMana);
         OnManaChanged?.Invoke(currentMana, maxMana);
+    }
+
+    public void SetSpellPoint(Transform newSpellPoint)
+    {
+        spellCastPoint = newSpellPoint;
     }
 }

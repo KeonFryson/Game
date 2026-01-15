@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 4248130851241128188}
   - component: {fileID: 4847323961154251845}
   m_Layer: 0
-  m_Name: FireBall
+  m_Name: FireBall_Scoll
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -28,13 +28,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1331778228688492785}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.4304593, y: -0.4777144, z: 0.56098557, w: 0.5213338}
+  m_LocalRotation: {x: -0.46078944, y: -0.4482945, z: 0.5198531, w: 0.56254596}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 50, y: 50, z: 50}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 7147440800241633362}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 5, y: -80, z: 90}
+  m_LocalEulerAnglesHint: {x: -3, y: -80, z: 88}
 --- !u!33 &3022867804145263519
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -128,3 +129,34 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.013093578
   m_Center: {x: -0.00004442362, y: 0.013295322, z: 1.7462295e-10}
+--- !u!1 &1447797649555006077
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7147440800241633362}
+  m_Layer: 0
+  m_Name: SpellPoint
+  m_TagString: SpellPoint
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7147440800241633362
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1447797649555006077}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7491897550516580838}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

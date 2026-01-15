@@ -183,6 +183,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Inventroy
   inventory: []
   maxInventorySize: 4
+--- !u!1 &657192107887642793
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2111565040486013464}
+  m_Layer: 0
+  m_Name: SpellPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2111565040486013464
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 657192107887642793}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.907}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8583726594308006621}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1863249750371512420
 GameObject:
   m_ObjectHideFlags: 0
@@ -382,13 +413,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpellCastingManager
   inventoryManager: {fileID: 0}
   inventory: {fileID: 983732182316531108}
-  spellCastPoint: {fileID: 8583726594308006621}
+  spellCastPoint: {fileID: 2111565040486013464}
   playerMovement: {fileID: 0}
   maxMana: 100
-  manaRegenRate: 5
+  manaRegenRate: 100
   globalCooldownTime: 0.5
   canMoveWhileChanneling: 1
   showChannelEffect: 1
+  chargeEffectPrefab: {fileID: 4772647874612310588, guid: 7ae4c34aac9b4cf4d973d4d0b64cd530, type: 3}
+  chargeEffectRadius: 2
+  minChannelPercentForCast: 0.1
+  manaText: {fileID: 0}
 --- !u!1 &7062883894433770727
 GameObject:
   m_ObjectHideFlags: 0
@@ -418,7 +453,8 @@ Transform:
   m_LocalPosition: {x: 0.641, y: 0, z: 1.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2111565040486013464}
   m_Father: {fileID: 3346899877856138935}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2824881493984363669

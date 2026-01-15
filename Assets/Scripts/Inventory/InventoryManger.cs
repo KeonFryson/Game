@@ -5,8 +5,6 @@ using UnityEngine.InputSystem;
 
 public class InventoryManger : MonoBehaviour
 {
- 
-
     public GameObject slotPrefab;
 
     public List<InventorySlot> inventorySlots = new List<InventorySlot>(4);
@@ -15,18 +13,26 @@ public class InventoryManger : MonoBehaviour
     private InputSystem_Actions inputActions;
     private Inventroy inventory;
     public PlayerMovement playerController;
+    public SpellCastingManager spellCastingManager; // Add reference to spell manager
+
     private void Awake()
-    { 
+    {
         inputActions = new InputSystem_Actions();
         inventory = GetComponent<Inventroy>();
         playerController = GetComponent<PlayerMovement>();
+        spellCastingManager = GetComponent<SpellCastingManager>(); // Get reference
+
         if (inventory == null)
         {
             inventory = FindFirstObjectByType<Inventroy>();
         }
-        if(playerController == null)
+        if (playerController == null)
         {
             playerController = FindFirstObjectByType<PlayerMovement>();
+        }
+        if (spellCastingManager == null)
+        {
+            spellCastingManager = FindFirstObjectByType<SpellCastingManager>();
         }
     }
 
@@ -34,6 +40,12 @@ public class InventoryManger : MonoBehaviour
     {
         InitializeHotbar();
         UpdateSlotSelection();
+    }
+
+    private void Update()
+    {
+        // Update cooldowns every frame
+        UpdateCooldownVisuals();
     }
 
     public void OnEnable()
@@ -92,7 +104,6 @@ public class InventoryManger : MonoBehaviour
         }
     }
 
-
     private void OnDropItem(InputAction.CallbackContext context)
     {
         if (inventory == null || inventory.inventory == null || inventory.inventory.Count == 0)
@@ -120,13 +131,46 @@ public class InventoryManger : MonoBehaviour
 
     void UpdateSlotSelection()
     {
-
         if (playerController.isDead)
             return;
 
         for (int i = 0; i < inventorySlots.Count; i++)
         {
             inventorySlots[i].SetSelected(i == currentSelectedSlot);
+        }
+    }
+
+    void UpdateCooldownVisuals()
+    {
+        if (spellCastingManager == null || inventory == null || inventory.inventory == null)
+            return;
+
+        for (int i = 0; i < inventorySlots.Count; i++)
+        {
+            if (i < inventory.inventory.Count)
+            {
+                InventoryItem item = inventory.inventory[i];
+
+                if (item != null && item.item != null && item.item.isSpell)
+                {
+                    float remainingCooldown = spellCastingManager.GetSpellCooldownRemaining(item.item.itemID);
+                    float totalCooldown = item.item.spellCooldown;
+
+                    // Calculate percentage (1 = full cooldown, 0 = ready)
+                    float cooldownPercent = totalCooldown > 0 ? remainingCooldown / totalCooldown : 0f;
+
+                    inventorySlots[i].UpdateCooldown(cooldownPercent);
+                }
+                else
+                {
+                    // Not a spell, no cooldown
+                    inventorySlots[i].UpdateCooldown(0f);
+                }
+            }
+            else
+            {
+                inventorySlots[i].UpdateCooldown(0f);
+            }
         }
     }
 
