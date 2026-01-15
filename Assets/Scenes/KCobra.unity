@@ -392,12 +392,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4392e5f67449c845b33b2071c94f6c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Crawler
-  floor: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
-  wall: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
-  path: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
-  width: 20
-  height: 2
-  depth: 20
 --- !u!114 &1854519774
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -431,9 +425,9 @@ MonoBehaviour:
   floor: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
   wall: {fileID: 1890715685185224551, guid: 11b09ca773723c64f8ebd56af331361e, type: 3}
   path: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
-  width: 20
+  width: 60
   height: 10
-  depth: 20
+  depth: 60
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
