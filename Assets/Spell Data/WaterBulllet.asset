@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de2b04b7e977617438e7b53522eb031d, type: 3}
+  m_Name: WaterBulllet
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemName: WaterBullet
+  itemID: 2
+  itemDescription: 
+  maxStackSize: 1
+  itemIcon: {fileID: 21300000, guid: 3cf8ae89579fd29479f4269d09600e16, type: 3}
+  itemPrefab: {fileID: 2935749900965970088, guid: bcabede6ad5776946bfeb1b61ecd5e71, type: 3}
+  isWeapon: 0
+  damage: 0
+  isConsumable: 0
+  healingAmount: 0
+  isSpell: 1
+  manaCost: 5
+  spellChannelTime: 0
+  spellCooldown: 0
+  spellSpeed: 30
+  spellEffectPrefab: {fileID: 7281924290810268254, guid: dc4785bc924726649abfc4cc3e3700f6, type: 3}
+  channelScaleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spellCastPointOffset: {x: 0, y: 0, z: 0}
+  customSpellCastPoint: {fileID: 0}

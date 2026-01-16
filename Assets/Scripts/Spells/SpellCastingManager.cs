@@ -5,13 +5,18 @@ using UnityEngine.InputSystem;
 
 public class SpellCastingManager : MonoBehaviour
 {
-    [Header("References")]
+    [Header("Caster Type")]
+    [SerializeField] private bool isPlayerControlled = true;
+
+    [Header("Player References")]
     [SerializeField] private InventoryManger inventoryManager;
     [SerializeField] private Inventroy inventory;
-    [SerializeField] private Transform spellCastPoint;
-    [SerializeField] private PlayerMovement playerMovement;
 
-    [Header("Player Stats")]
+    [Header("Shared References")]
+    [SerializeField] private Transform spellCastPoint;
+    [SerializeField] private MonoBehaviour movementController; // PlayerMovement or Enemy
+
+    [Header("Stats")]
     [SerializeField] private int maxMana = 100;
     [SerializeField] private float manaRegenRate = 5f;
     private int currentMana;
@@ -25,7 +30,7 @@ public class SpellCastingManager : MonoBehaviour
     [SerializeField] private bool showChannelEffect = true;
     [SerializeField] private GameObject chargeEffectPrefab;
     [SerializeField] private float chargeEffectRadius = 2f;
-    [SerializeField] private float minChannelPercentForCast = 0.1f; // Minimum 10% channel required to cast
+    [SerializeField] private float minChannelPercentForCast = 0.1f;
 
     private Dictionary<int, float> spellCooldowns = new Dictionary<int, float>();
     private InputSystem_Actions inputActions;
@@ -50,47 +55,68 @@ public class SpellCastingManager : MonoBehaviour
     public static event SpellChannelDelegate OnSpellChannelComplete;
     public static event SpellChannelDelegate OnSpellChannelInterrupted;
 
-
     [SerializeField] public TMPro.TextMeshProUGUI manaText;
 
     private void Awake()
     {
-        if (inventoryManager == null)
+        if (isPlayerControlled)
         {
-            inventoryManager = GetComponent<InventoryManger>();
+            if (inventoryManager == null)
+            {
+                inventoryManager = GetComponent<InventoryManger>();
+            }
+
+            if (inventory == null)
+            {
+                inventory = GetComponent<Inventroy>();
+            }
+
+            inputActions = new InputSystem_Actions();
         }
 
-        if (inventory == null)
+        if (movementController == null)
         {
-            inventory = GetComponent<Inventroy>();
-        }
-
-        if (playerMovement == null)
-        {
-            playerMovement = GetComponent<PlayerMovement>();
+            movementController = GetComponent<PlayerMovement>();
+            if (movementController == null)
+            {
+                movementController = GetComponent<Enemy>();
+            }
         }
 
         if (spellCastPoint == null)
         {
-            spellCastPoint = GameObject.Find("SpellPoint").transform;
+            GameObject spellPointObj = GameObject.Find("SpellPoint");
+            if (spellPointObj != null)
+            {
+                spellCastPoint = spellPointObj.transform;
+            }
+            else
+            {
+                spellCastPoint = transform;
+            }
         }
 
-        inputActions = new InputSystem_Actions();
         currentMana = maxMana;
     }
 
     private void OnEnable()
     {
-        inputActions.Player.Enable();
-        inputActions.Player.Attack.performed += OnSpellKeyPressed;
-        inputActions.Player.Attack.canceled += OnSpellKeyReleased;
+        if (isPlayerControlled && inputActions != null)
+        {
+            inputActions.Player.Enable();
+            inputActions.Player.Attack.performed += OnSpellKeyPressed;
+            inputActions.Player.Attack.canceled += OnSpellKeyReleased;
+        }
     }
 
     private void OnDisable()
     {
-        inputActions.Player.Attack.performed -= OnSpellKeyPressed;
-        inputActions.Player.Attack.canceled -= OnSpellKeyReleased;
-        inputActions.Player.Disable();
+        if (isPlayerControlled && inputActions != null)
+        {
+            inputActions.Player.Attack.performed -= OnSpellKeyPressed;
+            inputActions.Player.Attack.canceled -= OnSpellKeyReleased;
+            inputActions.Player.Disable();
+        }
     }
 
     private void Start()
@@ -103,11 +129,11 @@ public class SpellCastingManager : MonoBehaviour
         UpdateCooldowns();
         RegenerateMana();
         UpdateChanneling();
-        if (manaText != null)
+
+        if (manaText != null && isPlayerControlled)
         {
             manaText.text = $"Mana: {currentMana} / {maxMana}";
         }
-
     }
 
     private void OnSpellKeyPressed(InputAction.CallbackContext context)
@@ -194,7 +220,6 @@ public class SpellCastingManager : MonoBehaviour
         }
     }
 
-    // NEW: Get the appropriate cast point for a specific spell
     private Transform GetSpellCastPoint(ItemData spell)
     {
         if (spell.customSpellCastPoint != null)
@@ -204,22 +229,27 @@ public class SpellCastingManager : MonoBehaviour
         return spellCastPoint;
     }
 
-    // NEW: Get the spawn position with offset applied
     private Vector3 GetSpellSpawnPosition(ItemData spell)
     {
         Transform castPoint = GetSpellCastPoint(spell);
         return castPoint.position + castPoint.TransformDirection(spell.spellCastPointOffset);
     }
 
-    // NEW: Get the spawn rotation
     private Quaternion GetSpellSpawnRotation(ItemData spell)
     {
         Transform castPoint = GetSpellCastPoint(spell);
         return castPoint.rotation;
     }
 
+    // PUBLIC API: Player uses this (via inventory selection)
     public bool TryStartCastSpell()
     {
+        if (!isPlayerControlled)
+        {
+            Debug.LogWarning("TryStartCastSpell should only be called for player-controlled casters");
+            return false;
+        }
+
         if (inventory == null || inventoryManager == null)
         {
             Debug.LogWarning("Missing inventory references");
@@ -235,11 +265,56 @@ public class SpellCastingManager : MonoBehaviour
         InventoryItem currentItem = inventory.inventory[selectedSlot];
         if (currentItem == null || currentItem.item == null || !currentItem.item.isSpell)
         {
-            Debug.Log("Selected item is not a spell");
             return false;
         }
 
         return StartCastSpell(currentItem.item);
+    }
+
+    // PUBLIC API: AI uses this (direct spell casting)
+    public bool CastSpell(ItemData spell, Transform customCastPoint = null)
+    {
+        if (spell == null || !spell.isSpell)
+        {
+            Debug.LogWarning("Invalid spell data provided");
+            return false;
+        }
+
+        // Temporarily override cast point if provided
+        Transform originalCastPoint = null;
+        if (customCastPoint != null)
+        {
+            originalCastPoint = spellCastPoint;
+            spellCastPoint = customCastPoint;
+        }
+
+        bool result = StartCastSpell(spell);
+
+        // Restore original cast point
+        if (originalCastPoint != null)
+        {
+            spellCastPoint = originalCastPoint;
+        }
+
+        return result;
+    }
+
+    // PUBLIC API: Force release channel (useful for interrupts)
+    public void ForceReleaseChannel()
+    {
+        if (isChanneling)
+        {
+            ReleaseChannel();
+        }
+    }
+
+    // PUBLIC API: Force interrupt channel
+    public void ForceInterruptChannel()
+    {
+        if (isChanneling)
+        {
+            InterruptChannel();
+        }
     }
 
     private bool StartCastSpell(ItemData spell)
@@ -269,20 +344,20 @@ public class SpellCastingManager : MonoBehaviour
         currentMana -= spell.manaCost;
         OnManaChanged?.Invoke(currentMana, maxMana);
 
-        if (!canMoveWhileChanneling && playerMovement != null)
+        if (!canMoveWhileChanneling && movementController != null)
         {
-            playerMovement.enabled = false;
+            movementController.enabled = false;
         }
 
         Vector3 spawnPosition = GetSpellSpawnPosition(spell);
-        Quaternion spawnRotation = GetSpellSpawnRotation(spell);
+        // Use identity rotation instead of cast point rotation
+        Quaternion spawnRotation = Quaternion.identity;
 
         if (showChannelEffect && spell.spellEffectPrefab != null)
         {
             channelEffectInstance = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
-
+            Debug.Log("Spawned channel effect instance" + spawnRotation);
             originalEffectScale = spell.spellEffectPrefab.transform.localScale;
-
             channelEffectInstance.transform.localScale = Vector3.zero;
 
             Transform castPoint = GetSpellCastPoint(spell);
@@ -299,11 +374,9 @@ public class SpellCastingManager : MonoBehaviour
         OnSpellChannelStart?.Invoke(spell, 0f);
         Debug.Log($"Started channeling: {spell.itemName} for {spell.spellChannelTime}s");
     }
-
     private void CompleteChannel()
     {
         if (!isChanneling || channelingSpell == null) return;
-
         CastChanneledSpell(1f);
     }
 
@@ -332,14 +405,9 @@ public class SpellCastingManager : MonoBehaviour
         channelingSpell = null;
         channelTimer = 0f;
 
-        if (!canMoveWhileChanneling && playerMovement != null)
+        if (!canMoveWhileChanneling && movementController != null)
         {
-            playerMovement.enabled = true;
-        }
-
-        if (channelPercent >= 1f)
-        {
-            OnSpellChannelComplete?.Invoke(spell, 1f);
+            movementController.enabled = true;
         }
 
         globalCooldownTimer = globalCooldownTime;
@@ -348,7 +416,6 @@ public class SpellCastingManager : MonoBehaviour
         if (channelEffectInstance != null)
         {
             channelEffectInstance.transform.SetParent(null);
-
             channelEffectInstance.transform.localScale = originalEffectScale;
 
             Transform castPoint = GetSpellCastPoint(spell);
@@ -383,6 +450,11 @@ public class SpellCastingManager : MonoBehaviour
             chargeEffectInstance = null;
         }
 
+        if (channelPercent >= 1f)
+        {
+            OnSpellChannelComplete?.Invoke(spell, 1f);
+        }
+
         OnSpellCast?.Invoke(spell);
 
         if (channelPercent >= 1f)
@@ -406,9 +478,9 @@ public class SpellCastingManager : MonoBehaviour
         channelingSpell = null;
         channelTimer = 0f;
 
-        if (!canMoveWhileChanneling && playerMovement != null)
+        if (!canMoveWhileChanneling && movementController != null)
         {
-            playerMovement.enabled = true;
+            movementController.enabled = true;
         }
 
         if (channelEffectInstance != null)
@@ -480,17 +552,20 @@ public class SpellCastingManager : MonoBehaviour
         if (spell.spellEffectPrefab != null)
         {
             Vector3 spawnPosition = GetSpellSpawnPosition(spell);
-            Quaternion spawnRotation = GetSpellSpawnRotation(spell);
+            // Use identity rotation instead of cast point rotation
+            Quaternion spawnRotation = Quaternion.identity;
 
             GameObject spellEffect = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
-
+            Debug.Log("Spawned spell effect instance" + spawnRotation);
             spellEffect.transform.localScale = spell.spellEffectPrefab.transform.localScale;
 
             Transform castPoint = GetSpellCastPoint(spell);
             SpellProjectile projectile = spellEffect.GetComponent<SpellProjectile>();
             if (projectile != null)
             {
+                Debug.Log("Spell roataion" + spellEffect.transform.rotation);
                 projectile.Initialize(castPoint.forward, spell.spellSpeed, spell.spellChannelTime, 1f);
+                Debug.Log("Spell roataion" + spellEffect.transform.rotation);
             }
             else
             {

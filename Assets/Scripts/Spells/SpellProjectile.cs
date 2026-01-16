@@ -36,10 +36,15 @@ public class SpellProjectile : MonoBehaviour
 
     public void Initialize(Vector3 direction, float speed, float channeltime, float channelPercent = 1f)
     {
-        this.direction = direction.normalized;
+        this.direction = direction;
         this.speed = speed;
         this.damageMultiplier = channelPercent;
         lifetime += channeltime; // Extend lifetime by channel time
+
+        // Set initial rotation with 90 degree Y offset
+        transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 90, 0);
+
+        Debug.Log($"SpellProjectile initialized with direction: {this.direction}, speed: {speed}, channelPercent: {channelPercent}");
 
         // Ensure rb exists (in case Initialize is called before Awake)
         if (rb == null)
@@ -80,10 +85,8 @@ public class SpellProjectile : MonoBehaviour
         // Don't update physics if not initialized
         if (!isInitialized || rb == null)
         {
-
             return;
         }
-
 
         // Check lifetime
         if (Time.time - spawnTime >= lifetime)
@@ -99,13 +102,14 @@ public class SpellProjectile : MonoBehaviour
             Vector3 newDirection = Vector3.Lerp(rb.linearVelocity.normalized, targetDirection, homingStrength * Time.fixedDeltaTime);
             rb.linearVelocity = newDirection * speed;
 
-            // Rotate to face movement direction
-            transform.rotation = Quaternion.LookRotation(rb.linearVelocity);
+            // Update rotation to face the new direction with 90 degree Y offset
+            transform.rotation = Quaternion.LookRotation(newDirection) * Quaternion.Euler(0, 90, 0);
         }
         else if (!useGravity)
         {
             // Maintain constant velocity if not using gravity
             rb.linearVelocity = direction * speed;
+            transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 90, 0);
         }
     }
 
@@ -114,10 +118,9 @@ public class SpellProjectile : MonoBehaviour
         // Handle collision (damage, effects, etc.)
         float finalDamage = GetDamage();
         Debug.Log($"Spell hit: {collision.gameObject.name} for {finalDamage:F1} damage ({damageMultiplier * 100f:F0}% power)");
- 
+
         collision.gameObject.GetComponent<Enemy>()?.TakeDamage(finalDamage);
-
-
+        collision.gameObject.GetComponent<PlayerHealth>()?.TakeDamage(finalDamage);
 
         // Destroy the projectile on impact
         Destroy(gameObject);

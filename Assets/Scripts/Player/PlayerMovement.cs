@@ -32,11 +32,13 @@ public class PlayerMovement : MonoBehaviour
 
     private bool isCrouching;
     public bool isHoldingItem;
-    public bool isDead;
+ 
 
     // New: request flag so jump triggers immediately on button down
     private bool jumpRequested;
- 
+
+    public bool isDead => GetComponent<PlayerHealth>() != null && GetComponent<PlayerHealth>().IsDead();
+
 
 
     void Awake()
@@ -99,6 +101,10 @@ public class PlayerMovement : MonoBehaviour
 
     void Update()
     {
+        if (isDead)
+        {
+            canMove = false;
+        }
 
 
         Vector3 forward = transform.TransformDirection(Vector3.forward);
