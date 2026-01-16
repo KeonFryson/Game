@@ -358,11 +358,6 @@ GameObject:
   - component: {fileID: 1854519773}
   - component: {fileID: 1854519774}
   - component: {fileID: 1854519775}
-  - component: {fileID: 1854519780}
-  - component: {fileID: 1854519779}
-  - component: {fileID: 1854519778}
-  - component: {fileID: 1854519777}
-  - component: {fileID: 1854519776}
   m_Layer: 0
   m_Name: Generator
   m_TagString: Untagged
@@ -404,7 +399,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ba399d2b27e18284eb5e8d5815aaee0f, type: 3}
   m_Name: 
@@ -434,77 +429,6 @@ MonoBehaviour:
   height: 10
   depth: 60
   numberOfRooms: 10
---- !u!114 &1854519776
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f527b4cb7cf13af419e9b85f8c3dd8ef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WallBuilder
---- !u!114 &1854519777
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1f9f36afb5c10e499ef4119d6858e6c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RoomBuilder
---- !u!114 &1854519778
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46f3978edb3621041a77c3c9a1fd8a9c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PathBuilder
---- !u!114 &1854519779
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3265dbc967d83ab46938ff595a859931, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FloorBuilder
---- !u!114 &1854519780
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1854519771}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5dc4359f9e1e3ea48b3600908c282fe4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ConstructionManager
-  urbanPlanner: {fileID: 1854519775}
-  wallBuilder: {fileID: 1854519776}
-  roomBuilder: {fileID: 1854519777}
-  pathBuilder: {fileID: 1854519778}
-  floorBuilder: {fileID: 1854519779}
-  wallPrefab: {fileID: 1890715685185224551, guid: 1e47982d70a23784e9cec450f4f80b6f, type: 3}
-  floorPrefab: {fileID: 1890715685185224551, guid: 5393b1a1b9b89244486213aa4568413b, type: 3}
-  doorPrefab: {fileID: 1890715685185224551, guid: d41cd66a40bc90349bb96b2a9b9b0b50, type: 3}
-  playerPrefab: {fileID: 1863249750371512420, guid: 3c61a6289fb64d94988d081412fad990, type: 3}
-  autoBuildOnStart: 1
-  showGizmos: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
