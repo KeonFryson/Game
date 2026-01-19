@@ -12,8 +12,8 @@ public class GreenField : MonoBehaviour
 
     void Start()
     {
-       // InitializeFieldArray();
-       // GenerateFieldData();
+        InitializeFieldArray();
+        GenerateFieldData();
        // DrawField();  // Shows random data for debugging
     }
 
