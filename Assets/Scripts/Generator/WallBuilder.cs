@@ -1,23 +1,24 @@
 using UnityEngine;
+
 /// <summary>
-/// Builds room wall blocks (value 3)
+/// Builds solid wall blocks (value 1) - uncarved/unused walls
 /// </summary>
-public class RoomWallBuilder : MonoBehaviour
+public class SolidWallBuilder : MonoBehaviour
 {
     [Header("Prefab References")]
-    public GameObject roomWallPrefab;
+    public GameObject solidWallPrefab;
 
     [Header("Settings")]
     public Transform wallParent;
 
     [Header("Optimization")]
-    public bool makeStatic = true; // Toggle for static batching
+    public bool makeStatic = true; 
 
     public void BuildWalls(int[,,] fieldData, int width, int height, int depth)
     {
-        if (roomWallPrefab == null)
+        if (solidWallPrefab == null)
         {
-            Debug.LogError("RoomWallBuilder: No prefab assigned!");
+            Debug.LogError("SolidWallBuilder: No prefab assigned!");
             return;
         }
 
@@ -28,10 +29,10 @@ public class RoomWallBuilder : MonoBehaviour
             {
                 for (int z = 0; z < depth; z++)
                 {
-                    if (fieldData[x, y, z] == 3) // Room wall
+                    if (fieldData[x, y, z] == 1) // Solid wall
                     {
                         Vector3 position = new Vector3(x, y, z);
-                        GameObject wall = Instantiate(roomWallPrefab, position, Quaternion.identity);
+                        GameObject wall = Instantiate(solidWallPrefab, position, Quaternion.identity);
 
                         if (wallParent != null)
                         {
@@ -49,7 +50,7 @@ public class RoomWallBuilder : MonoBehaviour
                 }
             }
         }
-        Debug.Log($"RoomWallBuilder: Built {count} room walls");
+        Debug.Log($"SolidWallBuilder: Built {count} solid walls");
     }
 
     public void ClearWalls()
@@ -60,7 +61,7 @@ public class RoomWallBuilder : MonoBehaviour
             {
                 Destroy(child.gameObject);
             }
-            Debug.Log("RoomWallBuilder: Cleared all walls");
+            Debug.Log("SolidWallBuilder: Cleared all walls");
         }
     }
 }

@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 2090193357215576476}
   - component: {fileID: 7304397375111360007}
   m_Layer: 0
-  m_Name: TempWall
+  m_Name: TempHall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -67,7 +67,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9dffc725d9294844bba3b72d4834d763, type: 2}
+  - {fileID: 2100000, guid: 304122c45c1942d47942a339fecb7d6e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

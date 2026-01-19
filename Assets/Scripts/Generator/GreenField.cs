@@ -12,12 +12,12 @@ public class GreenField : MonoBehaviour
 
     void Start()
     {
-        InitializeFieldArray();
-        GenerateFieldData();
+        //InitializeFieldArray();
+       // GenerateFieldData();
        // DrawField();  // Shows random data for debugging
     }
 
-    void InitializeFieldArray()
+    public void InitializeFieldArray()
     {
         int w = Mathf.Max(1, width);
         int h = Mathf.Max(1, height);
