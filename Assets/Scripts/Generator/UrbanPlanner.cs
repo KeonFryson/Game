@@ -10,44 +10,46 @@ public class UrbanPlanner : GreenField
     [Header("Player Spawn")]
     public Vector3 playerSpawnPosition = Vector3.zero;
 
+    [Header("Generation Settings")]
+    public int maxStructures = 10;  // Total rooms + hallways to generate
+    public float hallwayChance = 0.3f;  // 30% chance to spawn hallway instead of room
+
     [Header("Room Settings")]
-    public int numberOfRooms = 5;
     public Vector2Int roomWidthRange = new Vector2Int(5, 9);
     public Vector2Int roomHeightRange = new Vector2Int(4, 6);
     public Vector2Int roomDepthRange = new Vector2Int(5, 9);
 
     [Header("Hall Settings")]
-    public int numberOfHalls = 5;
-    public Vector2Int HallWidthRange = new Vector2Int(5, 9);
-    public Vector2Int HallHeightRange = new Vector2Int(4, 6);
-    public Vector2Int HllDepthRange = new Vector2Int(5, 9);
+    public Vector2Int hallWidthRange = new Vector2Int(5, 9);
+    public Vector2Int hallHeightRange = new Vector2Int(4, 6);
+    public Vector2Int hallDepthRange = new Vector2Int(5, 9);
 
     [Header("Door Settings")]
-    public int doorWidth = 2;   // How wide the door is (X or Z)
-    public int doorHeight = 3;  // How tall the door is (Y)
+    public int doorWidth = 2;
+    public int doorHeight = 3;
+    public int minDoorsPerRoom = 1;
+    public int maxDoorsPerRoom = 4;
 
-    [Header("Corridor Settings")]
-    public int corridorWidth = 2;  // Should be at least doorWidth + 2
-    public int corridorHeight = 3; // Should match doorHeight
+    [Header("Connection Settings")]
+    public int connectionBuffer = 2;  // Space between structures
 
     // ===================================================================
     // DATA STRUCTURES
     // ===================================================================
 
-    // Tracks all placed structures (rooms and hallways)
     private List<RoomBounds> allRooms = new List<RoomBounds>();
+    private Queue<DoorNode> availableDoors = new Queue<DoorNode>();
+    private List<DoorNode> allDoors = new List<DoorNode>();
+    private int structureCounter = 0;
 
-    // Tracks all doors for connection logic
-    private List<DoorInfo> allDoors = new List<DoorInfo>();
-
-    // Represents the 3D bounds of a structure
     private struct RoomBounds
     {
         public int minX, maxX;
         public int minY, maxY;
         public int minZ, maxZ;
+        public int structureIndex;
 
-        public RoomBounds(int x, int y, int z, int width, int height, int depth)
+        public RoomBounds(int x, int y, int z, int width, int height, int depth, int index)
         {
             minX = x;
             maxX = x + width;
@@ -55,37 +57,25 @@ public class UrbanPlanner : GreenField
             maxY = y + height;
             minZ = z;
             maxZ = z + depth;
+            structureIndex = index;
         }
 
-        // Check if this structure overlaps with another
-        public bool Overlaps(RoomBounds other)
+        public bool Overlaps(RoomBounds other, int buffer = 0)
         {
-            bool xOverlap = minX < other.maxX && maxX > other.minX;
-            bool yOverlap = minY < other.maxY && maxY > other.minY;
-            bool zOverlap = minZ < other.maxZ && maxZ > other.minZ;
+            bool xOverlap = minX - buffer < other.maxX + buffer && maxX + buffer > other.minX - buffer;
+            bool yOverlap = minY - buffer < other.maxY + buffer && maxY + buffer > other.minY - buffer;
+            bool zOverlap = minZ - buffer < other.maxZ + buffer && maxZ + buffer > other.minZ - buffer;
 
             return xOverlap && yOverlap && zOverlap;
         }
     }
 
-    // Represents a door and its properties
-    private struct DoorInfo
+    private struct DoorNode
     {
-        public Vector3Int position;      // World position of door center
-        public int direction;            // 0=North, 1=South, 2=East, 3=West
-        public int structureIndex;       // Which structure this door belongs to
-    }
-
-    // ===================================================================
-    // UTILITY FUNCTIONS
-    // ===================================================================
-
-    // Check if a position is within the world bounds
-    bool IsInBounds(Vector3Int pos)
-    {
-        return pos.x >= 0 && pos.x < width &&
-               pos.y >= 0 && pos.y < height &&
-               pos.z >= 0 && pos.z < depth;
+        public Vector3Int position;      // Position at the door opening
+        public int direction;            // 0=North(+Z), 1=South(-Z), 2=East(+X), 3=West(-X)
+        public int parentStructureIndex; // Which structure this door belongs to
+        public bool isUsed;              // Has this door spawned a child room?
     }
 
     // ===================================================================
@@ -94,28 +84,24 @@ public class UrbanPlanner : GreenField
 
     public override void GenerateFieldData()
     {
-        Debug.Log("=== URBAN PLANNER: Starting generation ===");
+        Debug.Log("=== URBAN PLANNER: Graph-based generation starting ===");
 
         // Clear previous data
         allRooms.Clear();
+        availableDoors.Clear();
         allDoors.Clear();
+        structureCounter = 0;
 
-        // Step 1: Fill entire world with solid walls
+        // Step 1: Fill world with walls
         SetWall();
 
-        // Step 2: Add floor layer at bottom
+        // Step 2: Add floor layer
         SetFloor();
 
-        // Step 3: Place all rooms randomly
-        PlaceRooms();
+        // Step 3: Generate connected structures
+        GenerateConnectedStructures();
 
-        // Step 4: Place all hallways randomly
-        PlaceHallWays();
-
-        // Step 5: Connect all structures with corridors
-        ConnectDoors();
-
-        // Step 6: Determine player spawn position
+        // Step 4: Find player spawn
         FindPlayerSpawnPosition();
 
         Debug.Log($"Generation complete: {allRooms.Count} structures placed");
@@ -125,338 +111,279 @@ public class UrbanPlanner : GreenField
     // WORLD INITIALIZATION
     // ===================================================================
 
-
-    void FindPlayerSpawnPosition()
-    {
-        if (allRooms.Count == 0)
-        {
-            Debug.LogWarning("No rooms placed! Using world center as fallback.");
-            playerSpawnPosition = new Vector3(width / 2, 2, depth / 2);
-            return;
-        }
-
-        // Pick a random room
-        RoomBounds randomRoom = allRooms[Random.Range(0, allRooms.Count)];
-
-        // Calculate center of the room
-        float centerX = (randomRoom.minX + randomRoom.maxX) / 2f;
-        float centerY = randomRoom.minY + 0.5f; // Just above ground (y=1.5 instead of y=2)
-        float centerZ = (randomRoom.minZ + randomRoom.maxZ) / 2f;
-
-        playerSpawnPosition = new Vector3(centerX, centerY, centerZ);
-
-        Debug.Log($"Player spawn set to center of random room at: {playerSpawnPosition}");
-    }
-    // Fill the entire 3D grid with solid walls
     void SetWall()
     {
         for (int x = 0; x < width; x++)
-        {
             for (int y = 0; y < height; y++)
-            {
                 for (int z = 0; z < depth; z++)
-                {
-                    GreenFieldData[x, y, z] = 1; // 1 = solid wall
-                }
-            }
-        }
+                    GreenFieldData[x, y, z] = 1; // Solid wall
 
         Debug.Log("Filled world with walls");
     }
 
-    // Create a floor layer at y=0
     void SetFloor()
     {
         for (int x = 0; x < width; x++)
-        {
             for (int z = 0; z < depth; z++)
-            {
-                GreenFieldData[x, 0, z] = 0; // 0 = floor
-            }
-        }
+                GreenFieldData[x, 0, z] = 0; // Floor
 
         Debug.Log("Added floor layer");
     }
 
     // ===================================================================
-    // ROOM PLACEMENT
+    // GRAPH-BASED GENERATION
     // ===================================================================
 
-    // Attempt to place a single room
-    void PlaceRoom()
+    void GenerateConnectedStructures()
     {
-        int maxAttempts = 50;
+        // STEP 1: Place seed structure at world center
+        int seedX = width / 2;
+        int seedZ = depth / 2;
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        PlaceSeedStructure(seedX, 1, seedZ);
+
+        // STEP 2: Process door queue (breadth-first generation)
+        while (availableDoors.Count > 0 && structureCounter < maxStructures)
         {
-            // Generate random dimensions
-            int roomWidth = Random.Range(roomWidthRange.x, roomWidthRange.y);
-            int roomHeight = Random.Range(roomHeightRange.x, roomHeightRange.y);
-            int roomDepth = Random.Range(roomDepthRange.x, roomDepthRange.y);
+            DoorNode parentDoor = availableDoors.Dequeue();
 
-            // Check if room fits in world
-            if (roomWidth >= width - 2 || roomDepth >= depth - 2)
-            {
-                continue; // Too big, try again
-            }
-
-            // Generate random position (with edge padding)
-            int roomX = Random.Range(1, width - roomWidth - 1);
-            int roomY = 1; // Always place at ground level
-            int roomZ = Random.Range(1, depth - roomDepth - 1);
-
-            RoomBounds newRoom = new RoomBounds(roomX, roomY, roomZ, roomWidth, roomHeight, roomDepth);
-
-            // Check for overlaps with existing structures
-            bool canPlace = true;
-            foreach (RoomBounds existing in allRooms)
-            {
-                if (newRoom.Overlaps(existing))
-                {
-                    canPlace = false;
-                    break;
-                }
-            }
-
-            if (canPlace)
-            {
-                // Carve room: 3=walls, 2=interior
-                Carve(roomX, roomY, roomZ, roomWidth, roomHeight, roomDepth, 3, 2);
-                allRooms.Add(newRoom);
-
-                // Place doors on room walls
-                PlaceDoors(roomX, roomY, roomZ, roomWidth, roomDepth);
-
-                Debug.Log($"Room {allRooms.Count}: Size({roomWidth}x{roomHeight}x{roomDepth}) at ({roomX},{roomY},{roomZ})");
-                return;
-            }
+            // Try to spawn a new structure from this door
+            TrySpawnStructureFromDoor(parentDoor);
         }
 
-        Debug.LogWarning($"Couldn't place room after {maxAttempts} attempts");
+        Debug.Log($"Queue processed. Final structure count: {structureCounter}");
+    }
+    // Im going to break this up not a fan of  this doing too much in one function  so heres the seed structure placement
+    // well do a store thr  infor in a object or struct later
+
+    void PlaceSeedStructure(int x, int y, int z)
+    {
+        // Decide if seed is room or hallway
+        bool isHallway = Random.value < hallwayChance;
+
+        int w = Random.Range(roomWidthRange.x, roomWidthRange.y);
+        int h = Random.Range(roomHeightRange.x, roomHeightRange.y);
+        int d = Random.Range(roomDepthRange.x, roomDepthRange.y);
+
+        // Center the seed structure
+        x -= w / 2;
+        z -= d / 2;
+
+        // Ensure in bounds
+        x = Mathf.Clamp(x, 1, width - w - 1);
+        z = Mathf.Clamp(z, 1, depth - d - 1);
+
+        RoomBounds bounds = new RoomBounds(x, y, z, w, h, d, structureCounter);
+        allRooms.Add(bounds);
+
+        if (isHallway)
+        {
+            Carve(x, y, z, w, h, d, 7, 6); // Hallway
+            Debug.Log($"Seed Hallway 0: Size({w}x{h}x{d}) at ({x},{y},{z})");
+        }
+        else
+        {
+            Carve(x, y, z, w, h, d, 3, 2); // Room
+            Debug.Log($"Seed Room 0: Size({w}x{h}x{d}) at ({x},{y},{z})");
+        }
+
+        // Add seed doors to queue
+        AddDoorsToStructure(x, y, z, w, h, d, structureCounter);
+        structureCounter++;
     }
 
-    // Place all configured rooms
-    public void PlaceRooms()
+    void TrySpawnStructureFromDoor(DoorNode parentDoor)
     {
-        for (int i = 0; i < numberOfRooms; i++)
+        // Decide structure type
+        bool isHallway = Random.value < hallwayChance;
+
+        // Generate random dimensions
+        int w, h, d;
+        if (isHallway)
         {
-            PlaceRoom();
+            w = Random.Range(hallWidthRange.x, hallWidthRange.y);
+            h = Random.Range(hallHeightRange.x, hallHeightRange.y);
+            d = Random.Range(hallDepthRange.x, hallDepthRange.y);
         }
-    }
-
-    // ===================================================================
-    // HALLWAY PLACEMENT
-    // ===================================================================
-
-    // Attempt to place a single hallway
-    public void PlaceHallWay()
-    {
-        int maxAttempts = 50;
-
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        else
         {
-            // Generate random dimensions
-            int hallWidth = Random.Range(HallWidthRange.x, HallWidthRange.y);
-            int hallHeight = Random.Range(HallHeightRange.x, HallHeightRange.y);
-            int hallDepth = Random.Range(HllDepthRange.x, HllDepthRange.y);
-
-            // Check if hallway fits in world
-            if (hallWidth >= width - 2 || hallDepth >= depth - 2)
-            {
-                continue; // Too big, try again
-            }
-
-            // Generate random position (with edge padding)
-            int hallX = Random.Range(1, width - hallWidth - 1);
-            int hallY = 1; // Always place at ground level
-            int hallZ = Random.Range(1, depth - hallDepth - 1);
-
-            RoomBounds newHall = new RoomBounds(hallX, hallY, hallZ, hallWidth, hallHeight, hallDepth);
-
-            // Check for overlaps with existing structures
-            bool canPlace = true;
-            foreach (RoomBounds existing in allRooms)
-            {
-                if (newHall.Overlaps(existing))
-                {
-                    canPlace = false;
-                    break;
-                }
-            }
-
-            if (canPlace)
-            {
-                // Carve hallway: 7=walls, 6=interior
-                Carve(hallX, hallY, hallZ, hallWidth, hallHeight, hallDepth, 7, 6);
-                allRooms.Add(newHall);
-
-                // Place doors on hallway walls
-                PlaceDoors(hallX, hallY, hallZ, hallWidth, hallDepth);
-
-                Debug.Log($"Hallway {allRooms.Count}: Size({hallWidth}x{hallHeight}x{hallDepth}) at ({hallX},{hallY},{hallZ})");
-                return;
-            }
+            w = Random.Range(roomWidthRange.x, roomWidthRange.y);
+            h = Random.Range(roomHeightRange.x, roomHeightRange.y);
+            d = Random.Range(roomDepthRange.x, roomDepthRange.y);
         }
 
-        Debug.LogWarning($"Couldn't place hallway after {maxAttempts} attempts");
-    }
+        // Calculate new structure position based on parent door
+        Vector3Int newPos = CalculateStructurePosition(parentDoor, w, d);
 
-    // Place all configured hallways
-    public void PlaceHallWays()
-    {
-        for (int i = 0; i < numberOfHalls; i++)
+        // Check if position is valid
+        if (!IsPositionValid(newPos, w, h, d))
         {
-            PlaceHallWay();
-        }
-    }
-
-    // ===================================================================
-    // STRUCTURE CARVING
-    // ===================================================================
-
-    // Carve a hollow box structure into the grid
-    // Creates walls on edges and empty interior
-    void Carve(int x, int y, int z, int w, int h, int d, int wallValue = 3, int interiorValue = 2)
-    {
-        for (int ix = x; ix < x + w; ix++)
-        {
-            for (int iy = y; iy < y + h; iy++)
-            {
-                for (int iz = z; iz < z + d; iz++)
-                {
-                    if (ix < width && iy < height && iz < depth)
-                    {
-                        // Determine if this position is a wall or interior
-                        bool isWall = (ix == x || ix == x + w - 1 ||       // Left/Right walls
-                                       iz == z || iz == z + d - 1 ||       // Front/Back walls
-                                       iy == y + h - 1);                   // Ceiling
-
-                        if (isWall)
-                        {
-                            GreenFieldData[ix, iy, iz] = wallValue;
-                        }
-                        else
-                        {
-                            GreenFieldData[ix, iy, iz] = interiorValue;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ===================================================================
-    // DOOR PLACEMENT
-    // ===================================================================
-
-    // Place doors on structure walls, avoiding edges and facing center
-    void PlaceDoors(int x, int y, int z, int w, int d)
-    {
-        bool[] wallsWithDoors = new bool[4];
-        bool[] wallsValid = new bool[4];
-
-        int mapCenterX = width / 2;
-        int mapCenterZ = depth / 2;
-
-        // Validate each wall: ensure enough space for corridor
-        wallsValid[0] = (z + d + corridorWidth + 2 < depth);  // North
-        wallsValid[1] = (z - corridorWidth - 2 > 0);          // South
-        wallsValid[2] = (x + w + corridorWidth + 2 < width);  // East
-        wallsValid[3] = (x - corridorWidth - 2 > 0);          // West
-
-        // Count how many walls are valid
-        int validWallCount = 0;
-        for (int i = 0; i < 4; i++)
-        {
-            if (wallsValid[i]) validWallCount++;
-        }
-
-        if (validWallCount == 0)
-        {
-            Debug.LogError($"Structure at ({x},{y},{z}) has NO valid walls for doors!");
+            Debug.Log($"Failed to place structure from door at {parentDoor.position} (out of bounds or overlap)");
             return;
         }
 
-        // Determine number of doors (1-4, capped by valid walls)
-        int numDoors = Mathf.Min(Random.Range(1, 5), validWallCount);
-        int doorsPlaced = 0;
+        // Place the structure
+        RoomBounds bounds = new RoomBounds(newPos.x, newPos.y, newPos.z, w, h, d, structureCounter);
+        allRooms.Add(bounds);
 
-        // Prioritize walls facing toward center of map
-        List<int> preferredWalls = new List<int>();
-        List<int> otherWalls = new List<int>();
-
-        int structCenterX = x + w / 2;
-        int structCenterZ = z + d / 2;
-
-        for (int i = 0; i < 4; i++)
+        if (isHallway)
         {
-            if (!wallsValid[i]) continue;
-
-            bool facingCenter = false;
-
-            switch (i)
-            {
-                case 0: facingCenter = (structCenterZ < mapCenterZ); break; // North
-                case 1: facingCenter = (structCenterZ > mapCenterZ); break; // South
-                case 2: facingCenter = (structCenterX < mapCenterX); break; // East
-                case 3: facingCenter = (structCenterX > mapCenterX); break; // West
-            }
-
-            if (facingCenter)
-                preferredWalls.Add(i);
-            else
-                otherWalls.Add(i);
+            Carve(newPos.x, newPos.y, newPos.z, w, h, d, 7, 6);
+            Debug.Log($"Hallway {structureCounter}: Size({w}x{h}x{d}) at ({newPos.x},{newPos.y},{newPos.z})");
+        }
+        else
+        {
+            Carve(newPos.x, newPos.y, newPos.z, w, h, d, 3, 2);
+            Debug.Log($"Room {structureCounter}: Size({w}x{h}x{d}) at ({newPos.x},{newPos.y},{newPos.z})");
         }
 
-        // Select walls for doors (prefer center-facing)
-        while (doorsPlaced < numDoors)
-        {
-            int wallIndex;
+        // Create connection between parent door and new structure's matching door
+        ConnectDoorToStructure(parentDoor, newPos, w, d);
 
-            if (preferredWalls.Count > 0)
-            {
-                int idx = Random.Range(0, preferredWalls.Count);
-                wallIndex = preferredWalls[idx];
-                preferredWalls.RemoveAt(idx);
-            }
-            else if (otherWalls.Count > 0)
-            {
-                int idx = Random.Range(0, otherWalls.Count);
-                wallIndex = otherWalls[idx];
-                otherWalls.RemoveAt(idx);
-            }
-            else
-            {
-                break;
-            }
+        // Add new structure's OTHER doors to queue (not the one we just used)
+        AddDoorsToStructure(newPos.x, newPos.y, newPos.z, w, h, d, structureCounter, parentDoor.direction);
 
-            if (!wallsWithDoors[wallIndex])
-            {
-                wallsWithDoors[wallIndex] = true;
-                doorsPlaced++;
-            }
-        }
-
-        // Carve the actual door openings
-        if (wallsWithDoors[0]) CarveDoor(x, y, z, w, d, 0);
-        if (wallsWithDoors[1]) CarveDoor(x, y, z, w, d, 1);
-        if (wallsWithDoors[2]) CarveDoor(x, y, z, w, d, 2);
-        if (wallsWithDoors[3]) CarveDoor(x, y, z, w, d, 3);
-
-        // Record door positions for connection logic
-        RecordDoors(x, y, z, w, d, wallsWithDoors);
-
-        Debug.Log($"Placed {doorsPlaced} smart doors (valid walls: {validWallCount})");
+        structureCounter++;
     }
 
-    // Carve a door opening in a wall
-    void CarveDoor(int roomX, int roomY, int roomZ, int roomW, int roomD, int wall)
-    {
-        // wall: 0=North, 1=South, 2=East, 3=West
+    // ===================================================================
+    // POSITION CALCULATION
+    // ===================================================================
 
-        if (wall == 0 || wall == 1) // North or South walls (door spans X axis)
+    Vector3Int CalculateStructurePosition(DoorNode door, int structureWidth, int structureDepth)
+    {
+        int x = door.position.x;
+        int y = door.position.y;
+        int z = door.position.z;
+
+        // Need extra space: +1 for the wall itself, +buffer for gap, +1 for child's wall
+        int spacing = 2 + connectionBuffer;
+
+        switch (door.direction)
         {
-            int doorZ = (wall == 0) ? roomZ + roomD - 1 : roomZ;
+            case 0: // North (+Z) - new structure extends further north
+                x -= structureWidth / 2;
+                z += spacing; // Move beyond parent's wall + buffer
+                break;
+
+            case 1: // South (-Z) - new structure extends further south
+                x -= structureWidth / 2;
+                z -= (structureDepth + spacing); // Move beyond parent's wall + buffer
+                break;
+
+            case 2: // East (+X) - new structure extends further east
+                x += spacing; // Move beyond parent's wall + buffer
+                z -= structureDepth / 2;
+                break;
+
+            case 3: // West (-X) - new structure extends further west
+                x -= (structureWidth + spacing); // Move beyond parent's wall + buffer
+                z -= structureDepth / 2;
+                break;
+        }
+
+        return new Vector3Int(x, y, z);
+    }
+
+    bool IsPositionValid(Vector3Int pos, int w, int h, int d)
+    {
+        // Check world bounds
+        if (pos.x < 1 || pos.x + w >= width - 1) return false;
+        if (pos.z < 1 || pos.z + d >= depth - 1) return false;
+        if (pos.y < 1 || pos.y + h >= height - 1) return false;
+
+        // Check overlaps with existing structures
+        RoomBounds newBounds = new RoomBounds(pos.x, pos.y, pos.z, w, h, d, -1);
+        foreach (RoomBounds existing in allRooms)
+        {
+            if (newBounds.Overlaps(existing, connectionBuffer))
+                return false;
+        }
+
+        return true;
+    }
+
+    // ===================================================================
+    // DOOR MANAGEMENT
+    // ===================================================================
+
+    void AddDoorsToStructure(int x, int y, int z, int w, int h, int d, int structureIndex, int excludeDirection = -1)
+    {
+        List<int> doorDirections = new List<int>();
+
+        // STEP 1: If this is a child structure, FORCE a door on the connecting side
+        if (excludeDirection != -1)
+        {
+            int connectionDirection = GetOppositeDirection(excludeDirection);
+            doorDirections.Add(connectionDirection); // This door connects to parent
+            Debug.Log($"Structure {structureIndex}: Forced connection door in direction {connectionDirection} (parent was {excludeDirection})");
+        }
+
+        // STEP 2: Add additional random doors
+        List<int> availableDirections = new List<int> { 0, 1, 2, 3 };
+
+        // Remove the direction we already added (if any)
+        if (excludeDirection != -1)
+        {
+            int connectionDirection = GetOppositeDirection(excludeDirection);
+            availableDirections.Remove(connectionDirection);
+        }
+
+        // Determine how many ADDITIONAL doors to add (0 to maxDoorsPerRoom-1)
+        int additionalDoors = Random.Range(0, maxDoorsPerRoom);
+
+        // Shuffle and pick random additional doors
+        ShuffleList(availableDirections);
+        int numAdditional = Mathf.Min(additionalDoors, availableDirections.Count);
+
+        for (int i = 0; i < numAdditional; i++)
+        {
+            doorDirections.Add(availableDirections[i]);
+        }
+
+        // STEP 3: Carve all doors
+        foreach (int direction in doorDirections)
+        {
+            CarveDoor(x, y, z, w, d, direction);
+
+            Vector3Int doorPos = GetDoorPosition(x, y, z, w, d, direction);
+            DoorNode door = new DoorNode
+            {
+                position = doorPos,
+                direction = direction,
+                parentStructureIndex = structureIndex,
+                isUsed = (excludeDirection != -1 && direction == GetOppositeDirection(excludeDirection))
+            };
+
+            allDoors.Add(door);
+
+            // Only add to queue if it's not the connection door we just used
+            if (!(excludeDirection != -1 && direction == GetOppositeDirection(excludeDirection)))
+            {
+                availableDoors.Enqueue(door);
+            }
+        }
+
+        Debug.Log($"Added {doorDirections.Count} doors to structure {structureIndex} (directions: {string.Join(",", doorDirections)})");
+    }
+
+    Vector3Int GetDoorPosition(int x, int y, int z, int w, int d, int direction)
+    {
+        switch (direction)
+        {
+            case 0: return new Vector3Int(x + w / 2, y, z + d - 1); // North
+            case 1: return new Vector3Int(x + w / 2, y, z);          // South
+            case 2: return new Vector3Int(x + w - 1, y, z + d / 2); // East
+            case 3: return new Vector3Int(x, y, z + d / 2);          // West
+            default: return Vector3Int.zero;
+        }
+    }
+
+    void CarveDoor(int roomX, int roomY, int roomZ, int roomW, int roomD, int direction)
+    {
+        if (direction == 0 || direction == 1) // North/South (door spans X)
+        {
+            int doorZ = (direction == 0) ? roomZ + roomD - 1 : roomZ;
             int doorStartX = roomX + (roomW / 2) - (doorWidth / 2);
 
             for (int dx = 0; dx < doorWidth; dx++)
@@ -466,16 +393,14 @@ public class UrbanPlanner : GreenField
                     int px = doorStartX + dx;
                     int py = roomY + dy;
 
-                    if (px >= 0 && px < width && py >= 0 && py < height && doorZ >= 0 && doorZ < depth)
-                    {
-                        GreenFieldData[px, py, doorZ] = 5; // 5 = door
-                    }
+                    if (IsInBounds(new Vector3Int(px, py, doorZ)))
+                        GreenFieldData[px, py, doorZ] = 5; // Door
                 }
             }
         }
-        else // East or West walls (door spans Z axis)
+        else // East/West (door spans Z)
         {
-            int doorX = (wall == 2) ? roomX + roomW - 1 : roomX;
+            int doorX = (direction == 2) ? roomX + roomW - 1 : roomX;
             int doorStartZ = roomZ + (roomD / 2) - (doorWidth / 2);
 
             for (int dz = 0; dz < doorWidth; dz++)
@@ -485,335 +410,124 @@ public class UrbanPlanner : GreenField
                     int pz = doorStartZ + dz;
                     int py = roomY + dy;
 
-                    if (doorX >= 0 && doorX < width && py >= 0 && py < height && pz >= 0 && pz < depth)
+                    if (IsInBounds(new Vector3Int(doorX, py, pz)))
+                        GreenFieldData[doorX, py, pz] = 5; // Door
+                }
+            }
+        }
+    }
+
+    // ===================================================================
+    // DOOR CONNECTION (NO PATHFINDING!)
+    // ===================================================================
+
+    void ConnectDoorToStructure(DoorNode parentDoor, Vector3Int childPos, int childW, int childD)
+    {
+        // Find the matching door on the child structure
+        int childDirection = GetOppositeDirection(parentDoor.direction);
+        Vector3Int childDoor = GetDoorPosition(childPos.x, childPos.y, childPos.z, childW, childD, childDirection);
+
+        // Carve direct connection
+        CarveDirectConnection(parentDoor.position, childDoor);
+
+        Debug.Log($"Connected door at {parentDoor.position} to {childDoor}");
+    }
+
+    void CarveDirectConnection(Vector3Int from, Vector3Int to)
+    {
+        // This should be a very short distance (just the connectionBuffer)
+        int steps = Mathf.Max(Mathf.Abs(to.x - from.x), Mathf.Abs(to.z - from.z));
+
+        for (int i = 0; i <= steps; i++)
+        {
+            float t = i / (float)Mathf.Max(steps, 1);
+            Vector3Int pos = Vector3Int.RoundToInt(Vector3.Lerp(from, to, t));
+
+            // Carve simple corridor
+            for (int dx = -doorWidth / 2; dx <= doorWidth / 2; dx++)
+            {
+                for (int dy = 0; dy < doorHeight; dy++)
+                {
+                    for (int dz = -doorWidth / 2; dz <= doorWidth / 2; dz++)
                     {
-                        GreenFieldData[doorX, py, pz] = 5; // 5 = door
+                        Vector3Int p = pos + new Vector3Int(dx, dy, dz);
+
+                        if (IsInBounds(p) && GreenFieldData[p.x, p.y, p.z] == 1)
+                            GreenFieldData[p.x, p.y, p.z] = 8; // Corridor
                     }
                 }
             }
         }
     }
 
-    // Calculate the center position of a door (used for pathfinding)
-    Vector3Int GetDoorOuterPosition(int x, int y, int z, int w, int d, int direction)
-    {
-        int offset = corridorWidth / 2 + 1; // Extend beyond door
-
-        switch (direction)
-        {
-            case 0: // North - extend outward in +Z direction
-                return new Vector3Int(x + w / 2, y, z + d + offset);
-            case 1: // South - extend outward in -Z direction
-                return new Vector3Int(x + w / 2, y, z - offset);
-            case 2: // East - extend outward in +X direction
-                return new Vector3Int(x + w + offset, y, z + d / 2);
-            case 3: // West - extend outward in -X direction
-                return new Vector3Int(x - offset, y, z + d / 2);
-            default:
-                return Vector3Int.zero;
-        }
-    }
-
-    // Store door information for later connection
-    void RecordDoors(int x, int y, int z, int w, int d, bool[] wallsWithDoors)
-    {
-        for (int i = 0; i < 4; i++)
-        {
-            if (wallsWithDoors[i])
-            {
-                Vector3Int doorPos = GetDoorOuterPosition(x, y, z, w, d, i);
-                allDoors.Add(new DoorInfo
-                {
-                    position = doorPos,
-                    direction = i,
-                    structureIndex = allRooms.Count - 1
-                });
-            }
-        }
-    }
-
-
     // ===================================================================
-    // CORRIDOR CONNECTION SYSTEM
+    // STRUCTURE CARVING
     // ===================================================================
 
-    // Connect all structures with corridors
-    public void ConnectDoors()
+    void Carve(int x, int y, int z, int w, int h, int d, int wallValue, int interiorValue)
     {
-        HashSet<int> connected = new HashSet<int> { 0 }; // Seed structure 0
-
-        // Group doors by structure
-        Dictionary<int, List<DoorInfo>> doorsByStructure = new Dictionary<int, List<DoorInfo>>();
-        foreach (DoorInfo door in allDoors)
+        for (int ix = x; ix < x + w; ix++)
         {
-            if (!doorsByStructure.ContainsKey(door.structureIndex))
-                doorsByStructure[door.structureIndex] = new List<DoorInfo>();
-            doorsByStructure[door.structureIndex].Add(door);
-        }
-
-        // Connect each structure
-        foreach (var kvp in doorsByStructure)
-        {
-            int structureID = kvp.Key;
-            if (connected.Contains(structureID)) continue;
-
-            List<DoorInfo> myDoors = kvp.Value;
-            HashSet<int> alreadyConnectedTo = new HashSet<int>(); // Track which structures we've already targeted
-
-            // Each door connects to a DIFFERENT structure
-            foreach (DoorInfo myDoor in myDoors)
+            for (int iy = y; iy < y + h; iy++)
             {
-                DoorInfo target = FindNearestConnectedDoor(myDoor, connected, alreadyConnectedTo);
-
-                if (target.structureIndex != -1)
+                for (int iz = z; iz < z + d; iz++)
                 {
-                    CarveLShapedCorridor(myDoor.position, target.position);
-                    alreadyConnectedTo.Add(target.structureIndex); // Mark this structure as used
-                    Debug.Log($"Connected structure {structureID} door to structure {target.structureIndex}");
+                    if (IsInBounds(new Vector3Int(ix, iy, iz)))
+                    {
+                        bool isWall = (ix == x || ix == x + w - 1 ||
+                                       iz == z || iz == z + d - 1 ||
+                                       iy == y + h - 1);
+
+                        GreenFieldData[ix, iy, iz] = isWall ? wallValue : interiorValue;
+                    }
                 }
             }
-
-            // Mark as connected if we made at least one connection
-            if (alreadyConnectedTo.Count > 0)
-            {
-                connected.Add(structureID);
-            }
         }
-
-        Debug.Log($"Connected structures: {connected.Count} out of {allRooms.Count}");
-        foreach (int id in Enumerable.Range(0, allRooms.Count))
-        {
-            if (!connected.Contains(id))
-            {
-                Debug.LogWarning($"Structure {id} is ORPHANED (not connected)!");
-            }
-        }
-    }
-
-    // Find best door connection that has a clear path
-    // Tries all doors sorted by distance until finding one with clean path
-    DoorInfo FindBestCleanConnection(DoorInfo fromDoor, HashSet<int> connectedStructures, bool allowConnectedTargets = false)
-    {
-        List<(DoorInfo door, float distance)> candidates = new List<(DoorInfo, float)>();
-
-        foreach (DoorInfo door in allDoors)
-        {
-            // Skip doors from same structure
-            if (door.structureIndex == fromDoor.structureIndex)
-                continue;
-
-            // Allow or disallow already-connected structures as targets
-            if (!allowConnectedTargets && connectedStructures.Contains(door.structureIndex))
-                continue;
-
-            float distance = Vector3Int.Distance(fromDoor.position, door.position);
-            candidates.Add((door, distance));
-        }
-
-        // Sort by distance (try nearest first)
-        candidates.Sort((a, b) => a.distance.CompareTo(b.distance));
-
-        // Test each candidate for clean path
-        foreach (var candidate in candidates)
-        {
-            if (IsPathClear(fromDoor.position, candidate.door.position))
-            {
-                Debug.Log($"Found clean path from structure {fromDoor.structureIndex} to {candidate.door.structureIndex}");
-                return candidate.door;
-            }
-            else
-            {
-                Debug.Log($"Path blocked from structure {fromDoor.structureIndex} to {candidate.door.structureIndex}");
-            }
-        }
-
-        return new DoorInfo { structureIndex = -1 };
-    }
-
-    // Find nearest door, excluding structures we've already connected to
-    DoorInfo FindNearestConnectedDoor(DoorInfo fromDoor, HashSet<int> connected, HashSet<int> exclude)
-    {
-        float minDist = float.MaxValue;
-        DoorInfo nearest = new DoorInfo { structureIndex = -1 };
-
-        foreach (DoorInfo door in allDoors)
-        {
-            // Skip same structure
-            if (door.structureIndex == fromDoor.structureIndex) continue;
-
-            // Must be in connected network
-            if (!connected.Contains(door.structureIndex)) continue;
-
-            // Skip if we already connected to this structure
-            if (exclude.Contains(door.structureIndex)) continue;
-
-            float dist = Vector3.Distance(fromDoor.position, door.position);
-            if (dist < minDist)
-            {
-                minDist = dist;
-                nearest = door;
-            }
-        }
-
-        return nearest;
     }
 
     // ===================================================================
-    // PATH VALIDATION
+    // UTILITY FUNCTIONS
     // ===================================================================
 
-    // Check if an L-shaped path between two points is clear
-    // Tries both X-first and Z-first orientations
-    bool IsPathClear(Vector3Int start, Vector3Int end)
+    void FindPlayerSpawnPosition()
     {
-        // Try L-shape going X-first
-        Vector3Int corner1 = new Vector3Int(end.x, start.y, start.z);
-        bool path1Clear = IsLineClear(start, corner1) && IsLineClear(corner1, end);
+        if (allRooms.Count == 0)
+        {
+            playerSpawnPosition = new Vector3(width / 2, 2, depth / 2);
+            return;
+        }
 
-        if (path1Clear) return true;
-
-        // Try L-shape going Z-first
-        Vector3Int corner2 = new Vector3Int(start.x, start.y, end.z);
-        bool path2Clear = IsLineClear(start, corner2) && IsLineClear(corner2, end);
-
-        return path2Clear;
-    }
-
-    // Check if a straight line path is clear
-    // Tests the full corridor footprint (width x height) along the line
-    bool IsLineClear(Vector3Int from, Vector3Int to)
-    {
-        int steps = Mathf.Max(
-            Mathf.Abs(to.x - from.x),
-            Mathf.Abs(to.y - from.y),
-            Mathf.Abs(to.z - from.z)
+        RoomBounds spawnRoom = allRooms[0]; // Spawn in seed room
+        playerSpawnPosition = new Vector3(
+            (spawnRoom.minX + spawnRoom.maxX) / 2f,
+            spawnRoom.minY + 0.5f,
+            (spawnRoom.minZ + spawnRoom.maxZ) / 2f
         );
 
-        if (steps == 0) return true;
-
-        int halfWidth = corridorWidth / 2;
-
-        // Check each point along the line
-        for (int i = 0; i <= steps; i++)
-        {
-            float t = i / (float)steps;
-            Vector3Int pos = Vector3Int.RoundToInt(Vector3.Lerp(from, to, t));
-
-            // Check the corridor footprint at this position
-            for (int dx = -halfWidth; dx <= halfWidth; dx++)
-            {
-                for (int dy = 0; dy < corridorHeight; dy++)
-                {
-                    for (int dz = -halfWidth; dz <= halfWidth; dz++)
-                    {
-                        Vector3Int p = pos + new Vector3Int(dx, dy, dz);
-
-                        if (!IsInBounds(p))
-                            return false;
-
-                        int value = GreenFieldData[p.x, p.y, p.z];
-
-                        // Block on actual room/hallway structures
-                        // Allow: floor(0), walls(1), doors(5), corridors(8)
-                        // Block: room interior(2), room walls(3), hall interior(6), hall walls(7)
-                        if (value == 2 || value == 3 || value == 6 || value == 7)
-                        {
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        return true;
+        Debug.Log($"Player spawn: {playerSpawnPosition}");
     }
 
-    // ===================================================================
-    // CORRIDOR CARVING
-    // ===================================================================
-
-    // Carve an L-shaped corridor between two points
-    // Tests both orientations and uses the one that was validated as clear
-    void CarveLShapedCorridor(Vector3Int start, Vector3Int end)
+    bool IsInBounds(Vector3Int pos)
     {
-        // Always use X-first path for consistency
-        Vector3Int corner = new Vector3Int(end.x, start.y, start.z);
-
-        CarveLineCorridor(start, corner);
-        CarveLineCorridor(corner, end);
-
-        // Carve extra connection zone at start and end to ensure no gaps
-        CarveConnectionZone(start);
-        CarveConnectionZone(end);
+        return pos.x >= 0 && pos.x < width &&
+               pos.y >= 0 && pos.y < height &&
+               pos.z >= 0 && pos.z < depth;
     }
 
-    // Carve a small zone around door connection points to ensure smooth transitions
-    void CarveConnectionZone(Vector3Int center)
+    int GetOppositeDirection(int direction)
     {
-        int halfWidth = corridorWidth / 2;
-
-        for (int dx = -halfWidth; dx <= halfWidth; dx++)
-        {
-            for (int dy = 0; dy < corridorHeight; dy++)
-            {
-                for (int dz = -halfWidth; dz <= halfWidth; dz++)
-                {
-                    Vector3Int p = center + new Vector3Int(dx, dy, dz);
-
-                    if (IsInBounds(p))
-                    {
-                        int currentValue = GreenFieldData[p.x, p.y, p.z];
-
-                        // Carve through walls, preserve doors and interiors
-                        if (currentValue == 1) // Only solid walls
-                        {
-                            GreenFieldData[p.x, p.y, p.z] = 8; // Corridor
-                        }
-                    }
-                }
-            }
-        }
+        // 0=North ↔ 1=South, 2=East ↔ 3=West
+        return direction ^ 1;
     }
 
-    // Improved line corridor carving with better edge handling
-    void CarveLineCorridor(Vector3Int from, Vector3Int to)
+    void ShuffleList<T>(List<T> list)
     {
-        // Calculate direction vector
-        Vector3Int delta = to - from;
-        int steps = Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y), Mathf.Abs(delta.z));
-
-        if (steps == 0) return;
-
-        int halfWidth = corridorWidth / 2;
-
-        for (int i = 0; i <= steps; i++)
+        for (int i = list.Count - 1; i > 0; i--)
         {
-            float t = i / (float)steps;
-            Vector3Int pos = Vector3Int.RoundToInt(Vector3.Lerp(from, to, t));
-
-            // Carve corridor cross-section
-            for (int dx = -halfWidth; dx <= halfWidth; dx++)
-            {
-                for (int dy = 0; dy < corridorHeight; dy++)
-                {
-                    for (int dz = -halfWidth; dz <= halfWidth; dz++)
-                    {
-                        Vector3Int p = pos + new Vector3Int(dx, dy, dz);
-
-                        if (IsInBounds(p))
-                        {
-                            int currentValue = GreenFieldData[p.x, p.y, p.z];
-
-                            // Only carve through solid walls (1)
-                            // Preserve: floors(0), doors(5), room/hall interiors(2,6), existing corridors(8)
-                            if (currentValue == 1)
-                            {
-                                GreenFieldData[p.x, p.y, p.z] = 8; // Corridor
-                            }
-                        }
-                    }
-                }
-            }
+            int j = Random.Range(0, i + 1);
+            T temp = list[i];
+            list[i] = list[j];
+            list[j] = temp;
         }
     }
 
@@ -821,7 +535,6 @@ public class UrbanPlanner : GreenField
     // GIZMO VISUALIZATION
     // ===================================================================
 
-    // Draw colored cubes in the editor to visualize the level structure
     void OnDrawGizmos()
     {
         if (GreenFieldData == null) return;
@@ -836,46 +549,40 @@ public class UrbanPlanner : GreenField
 
                     switch (GreenFieldData[x, y, z])
                     {
-                        case 0: // Floor
-                            //Gizmos.color = new Color(0, 0, 1, 0.1f);
-                           // Gizmos.DrawWireCube(pos, Vector3.one * 0.9f);
-                            break;
-
-                        case 1: // Solid walls (hidden for clarity)
-                            break;
-
                         case 2: // Room interior
                             //Gizmos.color = new Color(1, 0, 0, 0.3f);
-                           // Gizmos.DrawCube(pos, Vector3.one * 0.6f);
+                            //Gizmos.DrawCube(pos, Vector3.one * 0.6f);
                             break;
-
                         case 3: // Room walls
-                           // Gizmos.color = new Color(1, 1, 0, 0.5f);
-                            //Gizmos.DrawCube(pos, Vector3.one * 0.85f);
+                          //  Gizmos.color = new Color(1, 1, 0, 0.5f);
+                           // Gizmos.DrawCube(pos, Vector3.one * 0.85f);
                             break;
-
                         case 5: // Doors
-                            //Gizmos.color = Color.magenta;
-                            //Gizmos.DrawCube(pos, Vector3.one * 0.7f);
+                           // Gizmos.color = Color.magenta;
+                           // Gizmos.DrawCube(pos, Vector3.one * 0.7f);
                             break;
-
                         case 6: // Hallway interior
                            // Gizmos.color = Color.cyan;
                            // Gizmos.DrawCube(pos, Vector3.one * 0.6f);
                             break;
-
                         case 7: // Hallway walls
                             //Gizmos.color = new Color(0, 0.5f, 1, 0.5f);
                            // Gizmos.DrawCube(pos, Vector3.one * 0.85f);
                             break;
-
-                        case 8: // Corridor connectors
-                            //Gizmos.color = new Color(0, 1, 0, 0.4f);
+                        case 8: // Corridors
+                           // Gizmos.color = new Color(0, 1, 0, 0.6f);
                             //Gizmos.DrawCube(pos, Vector3.one * 0.5f);
                             break;
                     }
                 }
             }
+        }
+
+        // Draw door nodes
+        foreach (DoorNode door in allDoors)
+        {
+           // Gizmos.color = door.isUsed ? Color.red : Color.green;
+           // Gizmos.DrawSphere(door.position, 0.3f);
         }
     }
 }
