@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de2b04b7e977617438e7b53522eb031d, type: 3}
+  m_Name: WaterBall
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemName: WaterBall
+  itemID: 4
+  itemDescription: 
+  maxStackSize: 1
+  itemIcon: {fileID: 21300000, guid: 160b197aba549514286b94426ceae589, type: 3}
+  itemPrefab: {fileID: 140545237360929898, guid: c3e6f08dc90eada44b49f2185a0acb2a, type: 3}
+  isWeapon: 0
+  damage: 25
+  isConsumable: 0
+  healingAmount: 0
+  isSpell: 1
+  manaCost: 10
+  spellChannelTime: 1
+  spellCooldown: 1
+  spellSpeed: 20
+  spellEffectPrefab: {fileID: 6554216268635952692, guid: 2ee9af64ed65e744da350051166f31ec, type: 3}
+  channelScaleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spellCastPointOffset: {x: 0.0002, y: -0.01465, z: 0.00597}
+  customSpellCastPoint: {fileID: 0}

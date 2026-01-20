@@ -11,6 +11,9 @@ public class SpellProjectile : MonoBehaviour
     [SerializeField] private float baseDamage = 10f;
     private float damageMultiplier = 1f;
 
+    [Header("Effects")]
+    [SerializeField] private GameObject impactEffect;
+
     [Header("Homing (Optional)")]
     [SerializeField] private bool isHoming = false;
     [SerializeField] private float homingStrength = 5f;
@@ -20,6 +23,14 @@ public class SpellProjectile : MonoBehaviour
     private Rigidbody rb;
     private float spawnTime;
     private bool isInitialized = false;
+
+    [Header("Rotation")]
+    [SerializeField] private Vector3 rotationOffset = new Vector3(0, 90, 0);
+
+    [Header("Debug")]
+    [SerializeField] private bool debugLogs = false;
+
+
 
     private void Awake()
     {
@@ -41,10 +52,11 @@ public class SpellProjectile : MonoBehaviour
         this.damageMultiplier = channelPercent;
         lifetime += channeltime; // Extend lifetime by channel time
 
-        // Set initial rotation with 90 degree Y offset
-        transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 90, 0);
+        // Set initial rotation with rotation offset
+        transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(rotationOffset);
 
-        Debug.Log($"SpellProjectile initialized with direction: {this.direction}, speed: {speed}, channelPercent: {channelPercent}");
+        if (debugLogs)
+            Debug.Log($"SpellProjectile initialized with direction: {this.direction}, speed: {speed}, channelPercent: {channelPercent}");
 
         // Ensure rb exists (in case Initialize is called before Awake)
         if (rb == null)
@@ -65,7 +77,8 @@ public class SpellProjectile : MonoBehaviour
         }
         else
         {
-            Debug.LogError("SpellProjectile: Rigidbody is null after initialization attempt!");
+            if (debugLogs)
+                Debug.LogError("SpellProjectile: Rigidbody is null after initialization attempt!");
         }
     }
 
@@ -102,14 +115,14 @@ public class SpellProjectile : MonoBehaviour
             Vector3 newDirection = Vector3.Lerp(rb.linearVelocity.normalized, targetDirection, homingStrength * Time.fixedDeltaTime);
             rb.linearVelocity = newDirection * speed;
 
-            // Update rotation to face the new direction with 90 degree Y offset
-            transform.rotation = Quaternion.LookRotation(newDirection) * Quaternion.Euler(0, 90, 0);
+            // Update rotation to face the new direction with rotation offset
+            transform.rotation = Quaternion.LookRotation(newDirection) * Quaternion.Euler(rotationOffset);
         }
         else if (!useGravity)
         {
             // Maintain constant velocity if not using gravity
             rb.linearVelocity = direction * speed;
-            transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 90, 0);
+            transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(rotationOffset);
         }
     }
 
@@ -117,10 +130,31 @@ public class SpellProjectile : MonoBehaviour
     {
         // Handle collision (damage, effects, etc.)
         float finalDamage = GetDamage();
-        Debug.Log($"Spell hit: {collision.gameObject.name} for {finalDamage:F1} damage ({damageMultiplier * 100f:F0}% power)");
+        if (debugLogs)
+            Debug.Log($"Spell hit: {collision.gameObject.name} for {finalDamage:F1} damage ({damageMultiplier * 100f:F0}% power)");
 
-        collision.gameObject.GetComponent<Enemy>()?.TakeDamage(finalDamage);
-        collision.gameObject.GetComponent<PlayerHealth>()?.TakeDamage(finalDamage);
+        bool hitTarget = false;
+
+        Enemy enemy = collision.gameObject.GetComponent<Enemy>();
+        if (enemy != null)
+        {
+            enemy.TakeDamage(finalDamage);
+            hitTarget = true;
+        }
+
+        PlayerHealth playerHealth = collision.gameObject.GetComponent<PlayerHealth>();
+        if (playerHealth != null)
+        {
+            playerHealth.TakeDamage(finalDamage);
+            hitTarget = true;
+        }
+
+        transform.position = collision.contacts[0].point;
+
+        if (!hitTarget && impactEffect != null)
+        {
+            Instantiate(impactEffect, transform.position, Quaternion.identity);
+        }
 
         // Destroy the projectile on impact
         Destroy(gameObject);

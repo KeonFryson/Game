@@ -8,6 +8,9 @@ public class SpellCastingManager : MonoBehaviour
     [Header("Caster Type")]
     [SerializeField] private bool isPlayerControlled = true;
 
+    [Header("Debug")]
+    [SerializeField] private bool enableDebug = false;
+
     [Header("Player References")]
     [SerializeField] private InventoryManger inventoryManager;
     [SerializeField] private Inventroy inventory;
@@ -15,6 +18,11 @@ public class SpellCastingManager : MonoBehaviour
     [Header("Shared References")]
     [SerializeField] private Transform spellCastPoint;
     [SerializeField] private MonoBehaviour movementController; // PlayerMovement or Enemy
+
+    [Header("Crosshair Aiming")]
+    [SerializeField] private Camera aimCamera;
+    [SerializeField] private float maxAimDistance = 100f;
+    [SerializeField] private LayerMask aimLayerMask = ~0; // Aim at everything by default
 
     [Header("Stats")]
     [SerializeField] private int maxMana = 100;
@@ -72,6 +80,22 @@ public class SpellCastingManager : MonoBehaviour
             }
 
             inputActions = new InputSystem_Actions();
+
+            // Get the camera from PlayerMovement if not assigned
+            if (aimCamera == null)
+            {
+                PlayerMovement pm = GetComponent<PlayerMovement>();
+                if (pm != null && pm.playerCamera != null)
+                {
+                    aimCamera = pm.playerCamera.GetComponent<Camera>();
+                }
+            }
+
+            // Fallback to main camera
+            if (aimCamera == null)
+            {
+                aimCamera = Camera.main;
+            }
         }
 
         if (movementController == null)
@@ -134,6 +158,8 @@ public class SpellCastingManager : MonoBehaviour
         {
             manaText.text = $"Mana: {currentMana} / {maxMana}";
         }
+
+
     }
 
     private void OnSpellKeyPressed(InputAction.CallbackContext context)
@@ -186,12 +212,19 @@ public class SpellCastingManager : MonoBehaviour
                 channelEffectInstance.transform.localScale = originalEffectScale * scaleMultiplier;
             }
 
+            // Update position to follow cast point
             channelEffectInstance.transform.position = currentCastPoint.position;
-            channelEffectInstance.transform.rotation = currentCastPoint.rotation;
+
+            // Orient towards crosshair during channeling (world space rotation)
+            Vector3 aimDirection = GetAimDirection();
+            channelEffectInstance.transform.rotation = Quaternion.LookRotation(aimDirection);
         }
 
         if (chargeEffectInstance != null)
         {
+            // Update charge effect position to follow cast point
+            chargeEffectInstance.transform.position = currentCastPoint.position;
+
             ParticleSystem ps = chargeEffectInstance.GetComponent<ParticleSystem>();
             if (ps != null)
             {
@@ -241,18 +274,111 @@ public class SpellCastingManager : MonoBehaviour
         return castPoint.rotation;
     }
 
+    /// <summary>
+    /// Get the direction to aim the spell based on crosshair position (screen center)
+    /// </summary>
+    private Vector3 GetAimDirection()
+    {
+        if (aimCamera == null)
+        {
+            // Fallback to forward direction if no camera
+            return transform.forward;
+        }
+
+        // Raycast from screen center (crosshair position)
+        Ray ray = aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+        Vector3 targetPoint;
+
+        if (Physics.Raycast(ray, out RaycastHit hit, maxAimDistance, aimLayerMask))
+        {
+            // Hit something, aim at that point
+            targetPoint = hit.point;
+        }
+        else
+        {
+            // Nothing hit, aim at max distance
+            targetPoint = ray.GetPoint(maxAimDistance);
+        }
+
+        // Calculate direction from spell cast point to target
+        Transform castPoint = spellCastPoint != null ? spellCastPoint : transform;
+        Vector3 direction = (targetPoint - castPoint.position).normalized;
+
+        return direction;
+    }
+
+    public void OnDrawGizmos()
+    {
+        if (!enableDebug || aimCamera == null || spellCastPoint == null)
+            return;
+
+        // Draw the raycast from camera
+        Ray ray = aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+        Vector3 targetPoint;
+        bool didHit = false;
+
+        if (Physics.Raycast(ray, out RaycastHit hit, maxAimDistance, aimLayerMask))
+        {
+            // Hit something
+            targetPoint = hit.point;
+            didHit = true;
+
+            // Draw camera ray to hit point in green
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(ray.origin, hit.point);
+
+            // Draw hit point as a sphere
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(hit.point, 0.1f);
+
+            // Draw hit normal
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(hit.point, hit.point + hit.normal * 0.5f);
+        }
+        else
+        {
+            // Nothing hit, aim at max distance
+            targetPoint = ray.GetPoint(maxAimDistance);
+            didHit = false;
+
+            // Draw camera ray to max distance in cyan
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(ray.origin, targetPoint);
+
+            // Draw end point
+            Gizmos.color = Color.white;
+            Gizmos.DrawSphere(targetPoint, 0.2f);
+        }
+
+        // Draw spell direction from cast point to target
+        Vector3 direction = (targetPoint - spellCastPoint.position).normalized;
+        Gizmos.color = didHit ? Color.blue : Color.magenta;
+        Gizmos.DrawLine(spellCastPoint.position, spellCastPoint.position + direction * 3f);
+        Gizmos.DrawSphere(spellCastPoint.position, 0.15f);
+
+        // Draw arrow head for direction
+        Vector3 arrowTip = spellCastPoint.position + direction * 3f;
+        Vector3 right = Vector3.Cross(direction, Vector3.up).normalized * 0.2f;
+        Vector3 up = Vector3.Cross(right, direction).normalized * 0.2f;
+
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + right);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - right);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + up);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - up);
+    }
+
     // PUBLIC API: Player uses this (via inventory selection)
     public bool TryStartCastSpell()
     {
         if (!isPlayerControlled)
         {
-            Debug.LogWarning("TryStartCastSpell should only be called for player-controlled casters");
+            if (enableDebug) Debug.LogWarning("TryStartCastSpell should only be called for player-controlled casters");
             return false;
         }
 
         if (inventory == null || inventoryManager == null)
         {
-            Debug.LogWarning("Missing inventory references");
+            if (enableDebug) Debug.LogWarning("Missing inventory references");
             return false;
         }
 
@@ -276,7 +402,7 @@ public class SpellCastingManager : MonoBehaviour
     {
         if (spell == null || !spell.isSpell)
         {
-            Debug.LogWarning("Invalid spell data provided");
+            if (enableDebug) Debug.LogWarning("Invalid spell data provided");
             return false;
         }
 
@@ -350,30 +476,30 @@ public class SpellCastingManager : MonoBehaviour
         }
 
         Vector3 spawnPosition = GetSpellSpawnPosition(spell);
-        // Use identity rotation instead of cast point rotation
-        Quaternion spawnRotation = Quaternion.identity;
+        Vector3 aimDirection = GetAimDirection();
+        Quaternion spawnRotation = Quaternion.LookRotation(aimDirection);
 
         if (showChannelEffect && spell.spellEffectPrefab != null)
         {
             channelEffectInstance = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
-            Debug.Log("Spawned channel effect instance" + spawnRotation);
+            if (enableDebug) Debug.Log("Spawned channel effect instance, aiming towards crosshair");
             originalEffectScale = spell.spellEffectPrefab.transform.localScale;
             channelEffectInstance.transform.localScale = Vector3.zero;
 
-            Transform castPoint = GetSpellCastPoint(spell);
-            channelEffectInstance.transform.SetParent(castPoint);
+            // Don't parent the channel effect - let it stay in world space so rotation works properly
+            // Position and rotation will be updated in UpdateChanneling()
         }
 
         if (chargeEffectPrefab != null)
         {
             chargeEffectInstance = Instantiate(chargeEffectPrefab, spawnPosition, Quaternion.identity);
-            Transform castPoint = GetSpellCastPoint(spell);
-            chargeEffectInstance.transform.SetParent(castPoint);
+            // Don't parent the charge effect either - update position in UpdateChanneling()
         }
 
         OnSpellChannelStart?.Invoke(spell, 0f);
-        Debug.Log($"Started channeling: {spell.itemName} for {spell.spellChannelTime}s");
+        if (enableDebug) Debug.Log($"Started channeling: {spell.itemName} for {spell.spellChannelTime}s");
     }
+
     private void CompleteChannel()
     {
         if (!isChanneling || channelingSpell == null) return;
@@ -415,18 +541,18 @@ public class SpellCastingManager : MonoBehaviour
 
         if (channelEffectInstance != null)
         {
-            channelEffectInstance.transform.SetParent(null);
+            // Already in world space, no need to unparent
             channelEffectInstance.transform.localScale = originalEffectScale;
 
-            Transform castPoint = GetSpellCastPoint(spell);
+            Vector3 aimDirection = GetAimDirection();
             SpellProjectile projectile = channelEffectInstance.GetComponent<SpellProjectile>();
             if (projectile != null)
             {
-                projectile.Initialize(castPoint.forward, spell.spellSpeed, spell.spellChannelTime, channelPercent);
+                projectile.Initialize(aimDirection, spell.spellSpeed, spell.spellChannelTime, channelPercent);
             }
             else
             {
-                Debug.LogWarning($"Spell effect prefab for {spell.itemName} is missing SpellProjectile component!");
+                if (enableDebug) Debug.LogWarning($"Spell effect prefab for {spell.itemName} is missing SpellProjectile component!");
             }
 
             ParticleSystem ps = channelEffectInstance.GetComponent<ParticleSystem>();
@@ -457,13 +583,16 @@ public class SpellCastingManager : MonoBehaviour
 
         OnSpellCast?.Invoke(spell);
 
-        if (channelPercent >= 1f)
+        if (enableDebug)
         {
-            Debug.Log($"Completed channeling: {spell.itemName}");
-        }
-        else
-        {
-            Debug.Log($"Released channeling early: {spell.itemName} at {channelPercent * 100f:F1}% power");
+            if (channelPercent >= 1f)
+            {
+                Debug.Log($"Completed channeling: {spell.itemName}");
+            }
+            else
+            {
+                Debug.Log($"Released channeling early: {spell.itemName} at {channelPercent * 100f:F1}% power");
+            }
         }
     }
 
@@ -500,7 +629,7 @@ public class SpellCastingManager : MonoBehaviour
         OnManaChanged?.Invoke(currentMana, maxMana);
 
         OnSpellChannelInterrupted?.Invoke(spell, progress);
-        Debug.Log($"Interrupted channeling: {spell.itemName} at {progress * 100f:F1}% - Mana refunded");
+        if (enableDebug) Debug.Log($"Interrupted channeling: {spell.itemName} at {progress * 100f:F1}% - Mana refunded");
     }
 
     private bool ExecuteSpell(ItemData spell)
@@ -521,25 +650,25 @@ public class SpellCastingManager : MonoBehaviour
     {
         if (isChanneling)
         {
-            Debug.Log("Already channeling a spell");
+            if (enableDebug) Debug.Log("Already channeling a spell");
             return false;
         }
 
         if (globalCooldownTimer > 0f)
         {
-            Debug.Log("Global cooldown active");
+            if (enableDebug) Debug.Log("Global cooldown active");
             return false;
         }
 
         if (spellCooldowns.ContainsKey(spell.itemID) && spellCooldowns[spell.itemID] > 0f)
         {
-            Debug.Log($"{spell.itemName} is on cooldown: {spellCooldowns[spell.itemID]:F1}s remaining");
+            if (enableDebug) Debug.Log($"{spell.itemName} is on cooldown: {spellCooldowns[spell.itemID]:F1}s remaining");
             return false;
         }
 
         if (currentMana < spell.manaCost)
         {
-            Debug.Log($"Not enough mana. Need {spell.manaCost}, have {currentMana}");
+            if (enableDebug) Debug.Log($"Not enough mana. Need {spell.manaCost}, have {currentMana}");
             return false;
         }
 
@@ -548,35 +677,32 @@ public class SpellCastingManager : MonoBehaviour
 
     private void CastSpellEffect(ItemData spell)
     {
-        Debug.Log($"Casting spell: {spell.itemName}");
+        if (enableDebug) Debug.Log($"Casting spell: {spell.itemName}");
         if (spell.spellEffectPrefab != null)
         {
             Vector3 spawnPosition = GetSpellSpawnPosition(spell);
-            // Use identity rotation instead of cast point rotation
-            Quaternion spawnRotation = Quaternion.identity;
+            Vector3 aimDirection = GetAimDirection();
+            Quaternion spawnRotation = Quaternion.LookRotation(aimDirection);
 
             GameObject spellEffect = Instantiate(spell.spellEffectPrefab, spawnPosition, spawnRotation);
-            Debug.Log("Spawned spell effect instance" + spawnRotation);
+            if (enableDebug) Debug.Log("Spawned spell effect instance, aiming towards crosshair");
             spellEffect.transform.localScale = spell.spellEffectPrefab.transform.localScale;
 
-            Transform castPoint = GetSpellCastPoint(spell);
             SpellProjectile projectile = spellEffect.GetComponent<SpellProjectile>();
             if (projectile != null)
             {
-                Debug.Log("Spell roataion" + spellEffect.transform.rotation);
-                projectile.Initialize(castPoint.forward, spell.spellSpeed, spell.spellChannelTime, 1f);
-                Debug.Log("Spell roataion" + spellEffect.transform.rotation);
+                projectile.Initialize(aimDirection, spell.spellSpeed, spell.spellChannelTime, 1f);
             }
             else
             {
-                Debug.LogWarning($"Spell effect prefab for {spell.itemName} is missing SpellProjectile component!");
+                if (enableDebug) Debug.LogWarning($"Spell effect prefab for {spell.itemName} is missing SpellProjectile component!");
             }
 
-            Debug.Log($"Cast spell: {spell.itemName}");
+            if (enableDebug) Debug.Log($"Cast spell: {spell.itemName}");
         }
         else
         {
-            Debug.LogWarning($"Spell {spell.itemName} has no effect prefab assigned");
+            if (enableDebug) Debug.LogWarning($"Spell {spell.itemName} has no effect prefab assigned");
         }
     }
 
@@ -637,5 +763,10 @@ public class SpellCastingManager : MonoBehaviour
     public void SetSpellPoint(Transform newSpellPoint)
     {
         spellCastPoint = newSpellPoint;
+    }
+
+    public void SetAimCamera(Camera camera)
+    {
+        aimCamera = camera;
     }
 }

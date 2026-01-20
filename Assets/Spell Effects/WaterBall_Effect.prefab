@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 379000128163282711}
   - component: {fileID: 7455733600104574669}
   - component: {fileID: 7357103006553490610}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: WaterBall_Effect
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4857,9 +4857,11 @@ MonoBehaviour:
   lifetime: 5
   useGravity: 0
   baseDamage: 10
+  impactEffect: {fileID: 7051161264409095752, guid: 0ad2f89ebfc50bd43a76aea980f28b22, type: 3}
   isHoming: 1
   homingStrength: 5
   target: {fileID: 0}
+  rotationOffset: {x: 0, y: 0, z: 0}
 --- !u!54 &379000128163282711
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4959,7 +4961,7 @@ GameObject:
   - component: {fileID: 9024596662649070616}
   - component: {fileID: 4574096583246143130}
   - component: {fileID: 1111967803281414722}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: WaterBall
   m_TagString: Untagged
   m_Icon: {fileID: 0}

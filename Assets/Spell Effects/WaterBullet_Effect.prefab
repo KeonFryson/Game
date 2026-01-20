@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 16732930765062515}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Front
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -42,7 +42,7 @@ GameObject:
   - component: {fileID: 7028228478302067507}
   - component: {fileID: 5294456054627442089}
   - component: {fileID: 6132221738248093117}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Bullet_Base (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5011,7 +5011,7 @@ GameObject:
   - component: {fileID: 5160524952272194049}
   - component: {fileID: 4619759824084254256}
   - component: {fileID: 8605770727103427407}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Bullet_Base (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -9983,7 +9983,7 @@ GameObject:
   - component: {fileID: 5797874720944664775}
   - component: {fileID: 6568001512939996452}
   - component: {fileID: 2779038846018331782}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: WaterBullet_Effect
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -14981,6 +14981,7 @@ MonoBehaviour:
   isHoming: 0
   homingStrength: 5
   target: {fileID: 0}
+  rotationOffset: {x: 0, y: 90, z: 0}
 --- !u!54 &6568001512939996452
 Rigidbody:
   m_ObjectHideFlags: 0

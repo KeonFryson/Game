@@ -208,7 +208,7 @@ Transform:
   m_GameObject: {fileID: 657192107887642793}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.907}
+  m_LocalPosition: {x: 0, y: 0.5, z: 0.907}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -230,6 +230,7 @@ GameObject:
   - component: {fileID: 5614739472049534797}
   - component: {fileID: 926071172083018223}
   - component: {fileID: 446497820786172016}
+  - component: {fileID: 6326194288839707705}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -325,8 +326,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c86ce132d5a495499b7ad63220c7c3f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Camera
-  firstpersonCamera: {fileID: 124018120126418103}
-  thirdpersonCamera: {fileID: 7972041609978187477}
+  firstPersonCamera: {fileID: 6192182109414608812}
+  thirdPersonCamera: {fileID: 5007265926487264008}
 --- !u!114 &1852535590293060277
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -350,7 +351,6 @@ MonoBehaviour:
   crouchHeight: 1
   crouchSpeed: 3
   isHoldingItem: 0
-  isDead: 0
 --- !u!136 &5614739472049534797
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -411,10 +411,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6bc69ab2ac4fc6941bfd9ba0b0cdea2d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpellCastingManager
+  isPlayerControlled: 1
+  enableDebug: 0
   inventoryManager: {fileID: 0}
   inventory: {fileID: 983732182316531108}
   spellCastPoint: {fileID: 2111565040486013464}
-  playerMovement: {fileID: 0}
+  movementController: {fileID: 0}
+  aimCamera: {fileID: 0}
+  maxAimDistance: 1000
+  aimLayerMask:
+    serializedVersion: 2
+    m_Bits: 345
   maxMana: 100
   manaRegenRate: 100
   globalCooldownTime: 0.5
@@ -424,6 +431,21 @@ MonoBehaviour:
   chargeEffectRadius: 2
   minChannelPercentForCast: 0.1
   manaText: {fileID: 0}
+--- !u!114 &6326194288839707705
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863249750371512420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fd6fcd0e0b585040a304346f0a0ba11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  maxHealth: 100
+  currentHealth: 0
+  deathAnimationDuration: 1
 --- !u!1 &7062883894433770727
 GameObject:
   m_ObjectHideFlags: 0
@@ -482,7 +504,7 @@ GameObject:
   - component: {fileID: 1211237771069715542}
   - component: {fileID: 8464758663226728459}
   m_Layer: 0
-  m_Name: ThreePerson Camera
+  m_Name: Third Person Camera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

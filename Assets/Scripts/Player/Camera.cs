@@ -1,19 +1,22 @@
 using UnityEngine;
 
-public class Camera : MonoBehaviour
+public class CameraSwitcher : MonoBehaviour
 {
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
-    [SerializeField]private GameObject firstpersonCamera;
-    [SerializeField]private GameObject thirdpersonCamera;
+    [SerializeField] private Camera firstPersonCamera;
+    [SerializeField] private Camera thirdPersonCamera;
+
+
     private PlayerMovement playerMovement;
     private InputSystem_Actions inputActions;
+
     void Awake()
     {
         playerMovement = GetComponent<PlayerMovement>();
-        inputActions = new InputSystem_Actions();
-        inputActions.Camera.SwitchCamera.performed += ctx => SwitchCamera();
 
+        inputActions = new InputSystem_Actions();
+        inputActions.Camera.SwitchCamera.performed += _ => SwitchCamera();
     }
 
     void OnEnable()
@@ -28,20 +31,14 @@ public class Camera : MonoBehaviour
 
     private void SwitchCamera()
     {
-        if(firstpersonCamera.activeSelf)
-        {
-            firstpersonCamera.SetActive(false);
-            thirdpersonCamera.SetActive(true);
-          playerMovement.SetCamera(thirdpersonCamera);
+        bool firstActive = firstPersonCamera.gameObject.activeSelf;
 
-        }
-        else
-        {
-            firstpersonCamera.SetActive(true);
-            thirdpersonCamera.SetActive(false);
-            playerMovement.SetCamera(firstpersonCamera);
-        }
+        firstPersonCamera.gameObject.SetActive(!firstActive);
+        thirdPersonCamera.gameObject.SetActive(firstActive);
 
+        playerMovement.SetCamera(
+            firstActive ? thirdPersonCamera.gameObject : firstPersonCamera.gameObject
+        );
     }
 
 }

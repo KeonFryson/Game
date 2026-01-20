@@ -11,7 +11,7 @@ public class InventoryManger : MonoBehaviour
 
     private int currentSelectedSlot = 0;
     private InputSystem_Actions inputActions;
-    private Inventroy inventory;
+    public Inventroy inventory;
     public PlayerMovement playerController;
     public SpellCastingManager spellCastingManager; // Add reference to spell manager
 
