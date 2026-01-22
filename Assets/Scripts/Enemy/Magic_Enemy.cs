@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class TestEnmey : Enemy
+public class Magic_Enemy : Enemy
 {
     [Header("Spell Settings")]
     [SerializeField] private ItemData[] attackSpells; // Changed to array of spells
@@ -131,12 +131,19 @@ public class TestEnmey : Enemy
 
         if (selectedSpell != null)
         {
+            // Aim the spell cast point at the player
+            if (player != null)
+            {
+                Vector3 directionToPlayer = (player.position - spellCastPoint.position).normalized;
+                spellCastPoint.rotation = Quaternion.LookRotation(directionToPlayer);
+            }
+
             bool success = spellCastingManager.CastSpell(selectedSpell, spellCastPoint);
 
             if (success)
             {
                 lastAttackTime = Time.time;
-                Debug.Log($"{gameObject.name} cast {selectedSpell.itemName}");
+                Debug.Log($"{gameObject.name} cast {selectedSpell.itemName} at player");
             }
         }
         else
@@ -201,6 +208,7 @@ public class TestEnmey : Enemy
     {
         base.OnDrawGizmos();
 
+        if(!isDebugging) return;
         // Draw attack range
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);

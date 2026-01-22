@@ -52,7 +52,7 @@ public abstract class Enemy : MonoBehaviour
     protected float timeSincePlayerSeen; // Timer tracking how long since player was last seen
     protected Animator animator;
     protected bool isDead;
-
+    [SerializeField] protected bool isDebugging = false;
     // Cached values for optimization
     private float detectionRangeSqr;
     private float waypointReachedDistanceSqr;
@@ -359,6 +359,8 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual void OnDrawGizmos()
     {
+        if(!isDebugging) return;
+
         Transform gizmoTransform = detectionTransform != null ? detectionTransform : transform;
 
         Gizmos.color = playerDetected ? Color.red : Color.yellow;
