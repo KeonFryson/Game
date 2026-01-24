@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 public class UrbanPlanner : GreenField
@@ -11,8 +10,11 @@ public class UrbanPlanner : GreenField
     public Vector3 playerSpawnPosition = Vector3.zero;
 
     [Header("Generation Settings")]
-    public int maxStructures = 10;  // Total rooms + hallways to generate
-    public float hallwayChance = 0.3f;  // 30% chance to spawn hallway instead of room
+    public int targetRooms = 20;
+    public int targetHallways = 15;
+    // Add more structure types here:
+    // public int targetGrandHalls = 3;
+    // public int targetBossRooms = 1;
 
     [Header("Room Settings")]
     public Vector2Int roomWidthRange = new Vector2Int(5, 9);
@@ -27,56 +29,64 @@ public class UrbanPlanner : GreenField
     [Header("Door Settings")]
     public int doorWidth = 2;
     public int doorHeight = 3;
-    public int minDoorsPerRoom = 1;
-    public int maxDoorsPerRoom = 4;
 
     [Header("Connection Settings")]
-    public int connectionBuffer = 2;  // Space between structures
+    public int connectionBuffer = 2;
 
     // ===================================================================
     // DATA STRUCTURES
     // ===================================================================
 
-    private List<RoomBounds> allRooms = new List<RoomBounds>();
-    private Queue<DoorNode> availableDoors = new Queue<DoorNode>();
-    private List<DoorNode> allDoors = new List<DoorNode>();
-    private int structureCounter = 0;
-
-    private struct RoomBounds
+    private class Structure
     {
-        public int minX, maxX;
-        public int minY, maxY;
-        public int minZ, maxZ;
-        public int structureIndex;
+        public int id;
+        public string type; // "Room", "Hallway", "GrandHall", "BossRoom", etc.
+        public int width, height, depth;
+        public Vector3Int position;
+        public List<int> connectedTo = new List<int>();
+        public List<DoorData> doors = new List<DoorData>();
 
-        public RoomBounds(int x, int y, int z, int width, int height, int depth, int index)
+        // Customizable values for different structure types
+        public int wallValue = 3;
+        public int interiorValue = 2;
+        public bool isBossRoom = false;
+        public bool isTreasureRoom = false;
+
+        public Structure(int id, bool isHallway, int w, int h, int d)
         {
-            minX = x;
-            maxX = x + width;
-            minY = y;
-            maxY = y + height;
-            minZ = z;
-            maxZ = z + depth;
-            structureIndex = index;
+            this.id = id;
+            this.type = isHallway ? "Hallway" : "Room";
+            this.width = w;
+            this.height = h;
+            this.depth = d;
+
+            if (isHallway)
+            {
+                wallValue = 7;
+                interiorValue = 6;
+            }
         }
 
-        public bool Overlaps(RoomBounds other, int buffer = 0)
+        // Constructor for custom types
+        public Structure(int id, string type, int w, int h, int d)
         {
-            bool xOverlap = minX - buffer < other.maxX + buffer && maxX + buffer > other.minX - buffer;
-            bool yOverlap = minY - buffer < other.maxY + buffer && maxY + buffer > other.minY - buffer;
-            bool zOverlap = minZ - buffer < other.maxZ + buffer && maxZ + buffer > other.minZ - buffer;
-
-            return xOverlap && yOverlap && zOverlap;
+            this.id = id;
+            this.type = type;
+            this.width = w;
+            this.height = h;
+            this.depth = d;
         }
     }
 
-    private struct DoorNode
+    private class DoorData
     {
-        public Vector3Int position;      // Position at the door opening
-        public int direction;            // 0=North(+Z), 1=South(-Z), 2=East(+X), 3=West(-X)
-        public int parentStructureIndex; // Which structure this door belongs to
-        public bool isUsed;              // Has this door spawned a child room?
+        public int direction; // 0=North, 1=South, 2=East, 3=West
+        public int connectsToStructureId; // Which structure this door leads to
     }
+
+    private List<Structure> allStructures = new List<Structure>();
+    private int roomCount = 0;
+    private int hallwayCount = 0;
 
     // ===================================================================
     // MAIN GENERATION PIPELINE
@@ -87,10 +97,9 @@ public class UrbanPlanner : GreenField
         Debug.Log("=== URBAN PLANNER: Graph-based generation starting ===");
 
         // Clear previous data
-        allRooms.Clear();
-        availableDoors.Clear();
-        allDoors.Clear();
-        structureCounter = 0;
+        allStructures.Clear();
+        roomCount = 0;
+        hallwayCount = 0;
 
         // Step 1: Fill world with walls
         SetWall();
@@ -104,7 +113,7 @@ public class UrbanPlanner : GreenField
         // Step 4: Find player spawn
         FindPlayerSpawnPosition();
 
-        Debug.Log($"Generation complete: {allRooms.Count} structures placed");
+        Debug.Log($"Generation complete: {allStructures.Count} structures placed");
     }
 
     // ===================================================================
@@ -131,251 +140,384 @@ public class UrbanPlanner : GreenField
     }
 
     // ===================================================================
-    // GRAPH-BASED GENERATION
+    // GENERATION PIPELINE
     // ===================================================================
 
     void GenerateConnectedStructures()
     {
-        // STEP 1: Place seed structure at world center
-        int seedX = width / 2;
-        int seedZ = depth / 2;
+        // STEP 1: Create all structures (each type separately)
+        CreateRooms();
+        CreateHallways();
+        // Easy to add more types:
+        // CreateGrandHalls();
+        // CreateBossRooms();
+        // CreateTreasureRooms();
 
-        PlaceSeedStructure(seedX, 1, seedZ);
+        // STEP 2: Build the connection graph (tree structure)
+        BuildConnectionGraph();
 
-        // STEP 2: Process door queue (breadth-first generation)
-        while (availableDoors.Count > 0 && structureCounter < maxStructures)
-        {
-            DoorNode parentDoor = availableDoors.Dequeue();
+        // STEP 3: Place structures spatially based on connections
+        PlaceStructuresSpatially();
 
-            // Try to spawn a new structure from this door
-            TrySpawnStructureFromDoor(parentDoor);
-        }
+        // STEP 4: Add doors between connected structures
+        AddDoorsToConnections();
 
-        Debug.Log($"Queue processed. Final structure count: {structureCounter}");
-    }
-    // Im going to break this up not a fan of  this doing too much in one function  so heres the seed structure placement
-    // well do a store thr  infor in a object or struct later
+        // STEP 5: Carve everything into the world
+        CarveAllStructures();
 
-    void PlaceSeedStructure(int x, int y, int z)
-    {
-        // Decide if seed is room or hallway
-        bool isHallway = Random.value < hallwayChance;
-
-        int w = Random.Range(roomWidthRange.x, roomWidthRange.y);
-        int h = Random.Range(roomHeightRange.x, roomHeightRange.y);
-        int d = Random.Range(roomDepthRange.x, roomDepthRange.y);
-
-        // Center the seed structure
-        x -= w / 2;
-        z -= d / 2;
-
-        // Ensure in bounds
-        x = Mathf.Clamp(x, 1, width - w - 1);
-        z = Mathf.Clamp(z, 1, depth - d - 1);
-
-        RoomBounds bounds = new RoomBounds(x, y, z, w, h, d, structureCounter);
-        allRooms.Add(bounds);
-
-        if (isHallway)
-        {
-            Carve(x, y, z, w, h, d, 7, 6); // Hallway
-            Debug.Log($"Seed Hallway 0: Size({w}x{h}x{d}) at ({x},{y},{z})");
-        }
-        else
-        {
-            Carve(x, y, z, w, h, d, 3, 2); // Room
-            Debug.Log($"Seed Room 0: Size({w}x{h}x{d}) at ({x},{y},{z})");
-        }
-
-        // Add seed doors to queue
-        AddDoorsToStructure(x, y, z, w, h, d, structureCounter);
-        structureCounter++;
-    }
-
-    void TrySpawnStructureFromDoor(DoorNode parentDoor)
-    {
-        // Decide structure type
-        bool isHallway = Random.value < hallwayChance;
-
-        // Generate random dimensions
-        int w, h, d;
-        if (isHallway)
-        {
-            w = Random.Range(hallWidthRange.x, hallWidthRange.y);
-            h = Random.Range(hallHeightRange.x, hallHeightRange.y);
-            d = Random.Range(hallDepthRange.x, hallDepthRange.y);
-        }
-        else
-        {
-            w = Random.Range(roomWidthRange.x, roomWidthRange.y);
-            h = Random.Range(roomHeightRange.x, roomHeightRange.y);
-            d = Random.Range(roomDepthRange.x, roomDepthRange.y);
-        }
-
-        // Calculate new structure position based on parent door
-        Vector3Int newPos = CalculateStructurePosition(parentDoor, w, d);
-
-        // Check if position is valid
-        if (!IsPositionValid(newPos, w, h, d))
-        {
-            Debug.Log($"Failed to place structure from door at {parentDoor.position} (out of bounds or overlap)");
-            return;
-        }
-
-        // Place the structure
-        RoomBounds bounds = new RoomBounds(newPos.x, newPos.y, newPos.z, w, h, d, structureCounter);
-        allRooms.Add(bounds);
-
-        if (isHallway)
-        {
-            Carve(newPos.x, newPos.y, newPos.z, w, h, d, 7, 6);
-            Debug.Log($"Hallway {structureCounter}: Size({w}x{h}x{d}) at ({newPos.x},{newPos.y},{newPos.z})");
-        }
-        else
-        {
-            Carve(newPos.x, newPos.y, newPos.z, w, h, d, 3, 2);
-            Debug.Log($"Room {structureCounter}: Size({w}x{h}x{d}) at ({newPos.x},{newPos.y},{newPos.z})");
-        }
-
-        // Create connection between parent door and new structure's matching door
-        ConnectDoorToStructure(parentDoor, newPos, w, d);
-
-        // Add new structure's OTHER doors to queue (not the one we just used)
-        AddDoorsToStructure(newPos.x, newPos.y, newPos.z, w, h, d, structureCounter, parentDoor.direction);
-
-        structureCounter++;
+        Debug.Log($"Generated {allStructures.Count} structures (Rooms: {roomCount}, Hallways: {hallwayCount})");
     }
 
     // ===================================================================
-    // POSITION CALCULATION
+    // STRUCTURE CREATION (One function per type)
     // ===================================================================
 
-    Vector3Int CalculateStructurePosition(DoorNode door, int structureWidth, int structureDepth)
+    void CreateRooms()
     {
-        int x = door.position.x;
-        int y = door.position.y;
-        int z = door.position.z;
+        Debug.Log($"=== Creating {targetRooms} rooms ===");
 
-        // Need extra space: +1 for the wall itself, +buffer for gap, +1 for child's wall
+        for (int i = 0; i < targetRooms; i++)
+        {
+            int w = Random.Range(roomWidthRange.x, roomWidthRange.y);
+            int h = Random.Range(roomHeightRange.x, roomHeightRange.y);
+            int d = Random.Range(roomDepthRange.x, roomDepthRange.y);
+
+            Structure room = new Structure(allStructures.Count, false, w, h, d);
+            allStructures.Add(room);
+            roomCount++;
+        }
+
+        Debug.Log($"Created {roomCount} rooms");
+    }
+
+    void CreateHallways()
+    {
+        Debug.Log($"=== Creating {targetHallways} hallways ===");
+
+        for (int i = 0; i < targetHallways; i++)
+        {
+            int w = Random.Range(hallWidthRange.x, hallWidthRange.y);
+            int h = Random.Range(hallHeightRange.x, hallHeightRange.y);
+            int d = Random.Range(hallDepthRange.x, hallDepthRange.y);
+
+            Structure hallway = new Structure(allStructures.Count, true, w, h, d);
+            allStructures.Add(hallway);
+            hallwayCount++;
+        }
+
+        Debug.Log($"Created {hallwayCount} hallways");
+    }
+
+    // Example: Add more structure types following this pattern
+    /*
+    void CreateGrandHalls()
+    {
+        Debug.Log($"=== Creating {targetGrandHalls} grand halls ===");
+        
+        for (int i = 0; i < targetGrandHalls; i++)
+        {
+            int w = 12; // Larger fixed size
+            int h = 8;
+            int d = 12;
+            
+            Structure grandHall = new Structure(allStructures.Count, "GrandHall", w, h, d);
+            grandHall.wallValue = 9;
+            grandHall.interiorValue = 10;
+            allStructures.Add(grandHall);
+        }
+    }
+
+    void CreateBossRooms()
+    {
+        Debug.Log($"=== Creating {targetBossRooms} boss rooms ===");
+        
+        for (int i = 0; i < targetBossRooms; i++)
+        {
+            int w = 15;
+            int h = 10;
+            int d = 15;
+            
+            Structure bossRoom = new Structure(allStructures.Count, "BossRoom", w, h, d);
+            bossRoom.wallValue = 11;
+            bossRoom.interiorValue = 12;
+            bossRoom.isBossRoom = true;
+            allStructures.Add(bossRoom);
+        }
+    }
+    */
+
+    // ===================================================================
+    // CONNECTION GRAPH (Tree Structure)
+    // ===================================================================
+
+    void BuildConnectionGraph()
+    {
+        Debug.Log("=== Building connection graph ===");
+
+        if (allStructures.Count == 0) return;
+
+        List<Structure> unconnected = new List<Structure>(allStructures);
+        List<Structure> connected = new List<Structure>();
+
+        // Start with first structure as root
+        Structure root = unconnected[0];
+        unconnected.RemoveAt(0);
+        connected.Add(root);
+
+        // Connect remaining structures in a branching tree pattern
+        while (unconnected.Count > 0)
+        {
+            // Pick a random already-connected structure to branch from
+            Structure parent = connected[Random.Range(0, connected.Count)];
+
+            // Pick a random unconnected structure to attach
+            Structure child = unconnected[0];
+            unconnected.RemoveAt(0);
+
+            // Create bidirectional connection
+            parent.connectedTo.Add(child.id);
+            child.connectedTo.Add(parent.id);
+
+            connected.Add(child);
+
+            Debug.Log($"Connected structure {child.id} ({child.type}) to {parent.id} ({parent.type})");
+        }
+    }
+
+    // ===================================================================
+    // SPATIAL PLACEMENT
+    // ===================================================================
+
+    void PlaceStructuresSpatially()
+    {
+        Debug.Log("=== Placing structures spatially ===");
+
+        if (allStructures.Count == 0) return;
+
+        // Start first structure at world center
+        Structure root = allStructures[0];
+        root.position = new Vector3Int(
+            width / 2 - root.width / 2,
+            1,
+            depth / 2 - root.depth / 2
+        );
+
+        HashSet<int> placed = new HashSet<int> { 0 };
+        Queue<int> toPlace = new Queue<int>();
+        toPlace.Enqueue(0);
+
+        // Place structures breadth-first from connections
+        while (toPlace.Count > 0)
+        {
+            int currentId = toPlace.Dequeue();
+            Structure current = allStructures[currentId];
+
+            foreach (int connectedId in current.connectedTo)
+            {
+                if (placed.Contains(connectedId)) continue;
+
+                Structure child = allStructures[connectedId];
+
+                // Try to place child next to current
+                if (TryPlaceNextTo(current, child))
+                {
+                    placed.Add(connectedId);
+                    toPlace.Enqueue(connectedId);
+                    Debug.Log($"Placed structure {child.id} ({child.type}) at {child.position}");
+                }
+                else
+                {
+                    Debug.LogWarning($"Failed to place structure {child.id} ({child.type})");
+                }
+            }
+        }
+
+        Debug.Log($"Placed {placed.Count}/{allStructures.Count} structures");
+    }
+
+    bool TryPlaceNextTo(Structure parent, Structure child)
+    {
+        // Try all 4 directions
+        List<int> directions = new List<int> { 0, 1, 2, 3 };
+        ShuffleList(directions);
+
+        foreach (int direction in directions)
+        {
+            Vector3Int pos = CalculatePositionNextTo(parent, direction, child.width, child.depth);
+
+            if (IsPositionValidForStructure(pos, child.width, child.height, child.depth))
+            {
+                child.position = pos;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    Vector3Int CalculatePositionNextTo(Structure parent, int direction, int childW, int childD)
+    {
         int spacing = 2 + connectionBuffer;
+        int x = 0, y = parent.position.y, z = 0;
 
-        switch (door.direction)
+        switch (direction)
         {
-            case 0: // North (+Z) - new structure extends further north
-                x -= structureWidth / 2;
-                z += spacing; // Move beyond parent's wall + buffer
+            case 0: // North
+                x = parent.position.x + parent.width / 2 - childW / 2;
+                z = parent.position.z + parent.depth + spacing;
                 break;
-
-            case 1: // South (-Z) - new structure extends further south
-                x -= structureWidth / 2;
-                z -= (structureDepth + spacing); // Move beyond parent's wall + buffer
+            case 1: // South
+                x = parent.position.x + parent.width / 2 - childW / 2;
+                z = parent.position.z - childD - spacing;
                 break;
-
-            case 2: // East (+X) - new structure extends further east
-                x += spacing; // Move beyond parent's wall + buffer
-                z -= structureDepth / 2;
+            case 2: // East
+                x = parent.position.x + parent.width + spacing;
+                z = parent.position.z + parent.depth / 2 - childD / 2;
                 break;
-
-            case 3: // West (-X) - new structure extends further west
-                x -= (structureWidth + spacing); // Move beyond parent's wall + buffer
-                z -= structureDepth / 2;
+            case 3: // West
+                x = parent.position.x - childW - spacing;
+                z = parent.position.z + parent.depth / 2 - childD / 2;
                 break;
         }
 
         return new Vector3Int(x, y, z);
     }
 
-    bool IsPositionValid(Vector3Int pos, int w, int h, int d)
+    bool IsPositionValidForStructure(Vector3Int pos, int w, int h, int d)
     {
-        // Check world bounds
+        // Check bounds
         if (pos.x < 1 || pos.x + w >= width - 1) return false;
         if (pos.z < 1 || pos.z + d >= depth - 1) return false;
         if (pos.y < 1 || pos.y + h >= height - 1) return false;
 
-        // Check overlaps with existing structures
-        RoomBounds newBounds = new RoomBounds(pos.x, pos.y, pos.z, w, h, d, -1);
-        foreach (RoomBounds existing in allRooms)
+        // Check overlap with already-placed structures
+        foreach (Structure s in allStructures)
         {
-            if (newBounds.Overlaps(existing, connectionBuffer))
-                return false;
+            if (s.position == Vector3Int.zero) continue; // Not placed yet
+
+            bool overlap = !(pos.x + w + connectionBuffer < s.position.x ||
+                            pos.x > s.position.x + s.width + connectionBuffer ||
+                            pos.z + d + connectionBuffer < s.position.z ||
+                            pos.z > s.position.z + s.depth + connectionBuffer);
+
+            if (overlap) return false;
         }
 
         return true;
     }
 
     // ===================================================================
-    // DOOR MANAGEMENT
+    // DOOR PLACEMENT
     // ===================================================================
 
-    void AddDoorsToStructure(int x, int y, int z, int w, int h, int d, int structureIndex, int excludeDirection = -1)
+    void AddDoorsToConnections()
     {
-        List<int> doorDirections = new List<int>();
+        Debug.Log("=== Adding doors ===");
 
-        // STEP 1: If this is a child structure, FORCE a door on the connecting side
-        if (excludeDirection != -1)
+        foreach (Structure s1 in allStructures)
         {
-            int connectionDirection = GetOppositeDirection(excludeDirection);
-            doorDirections.Add(connectionDirection); // This door connects to parent
-            Debug.Log($"Structure {structureIndex}: Forced connection door in direction {connectionDirection} (parent was {excludeDirection})");
-        }
+            if (s1.position == Vector3Int.zero) continue; // Skip unplaced
 
-        // STEP 2: Add additional random doors
-        List<int> availableDirections = new List<int> { 0, 1, 2, 3 };
-
-        // Remove the direction we already added (if any)
-        if (excludeDirection != -1)
-        {
-            int connectionDirection = GetOppositeDirection(excludeDirection);
-            availableDirections.Remove(connectionDirection);
-        }
-
-        // Determine how many ADDITIONAL doors to add (0 to maxDoorsPerRoom-1)
-        int additionalDoors = Random.Range(0, maxDoorsPerRoom);
-
-        // Shuffle and pick random additional doors
-        ShuffleList(availableDirections);
-        int numAdditional = Mathf.Min(additionalDoors, availableDirections.Count);
-
-        for (int i = 0; i < numAdditional; i++)
-        {
-            doorDirections.Add(availableDirections[i]);
-        }
-
-        // STEP 3: Carve all doors
-        foreach (int direction in doorDirections)
-        {
-            CarveDoor(x, y, z, w, d, direction);
-
-            Vector3Int doorPos = GetDoorPosition(x, y, z, w, d, direction);
-            DoorNode door = new DoorNode
+            foreach (int connectedId in s1.connectedTo)
             {
-                position = doorPos,
-                direction = direction,
-                parentStructureIndex = structureIndex,
-                isUsed = (excludeDirection != -1 && direction == GetOppositeDirection(excludeDirection))
-            };
+                Structure s2 = allStructures[connectedId];
+                if (s2.position == Vector3Int.zero) continue;
 
-            allDoors.Add(door);
+                // Check if we already added a door for this connection
+                bool alreadyHasDoor = false;
+                foreach (DoorData door in s1.doors)
+                {
+                    if (door.connectsToStructureId == s2.id)
+                    {
+                        alreadyHasDoor = true;
+                        break;
+                    }
+                }
 
-            // Only add to queue if it's not the connection door we just used
-            if (!(excludeDirection != -1 && direction == GetOppositeDirection(excludeDirection)))
-            {
-                availableDoors.Enqueue(door);
+                if (alreadyHasDoor) continue;
+
+                // Determine direction from s1 to s2
+                int direction = GetDirectionBetween(s1, s2);
+                if (direction == -1) continue;
+
+                // Add door to s1
+                s1.doors.Add(new DoorData { direction = direction, connectsToStructureId = s2.id });
+                Debug.Log($"Added door: Structure {s1.id} -> {s2.id} (direction {direction})");
             }
         }
-
-        Debug.Log($"Added {doorDirections.Count} doors to structure {structureIndex} (directions: {string.Join(",", doorDirections)})");
     }
 
-    Vector3Int GetDoorPosition(int x, int y, int z, int w, int d, int direction)
+    int GetDirectionBetween(Structure from, Structure to)
     {
-        switch (direction)
+        int fromCenterX = from.position.x + from.width / 2;
+        int fromCenterZ = from.position.z + from.depth / 2;
+        int toCenterX = to.position.x + to.width / 2;
+        int toCenterZ = to.position.z + to.depth / 2;
+
+        int deltaX = toCenterX - fromCenterX;
+        int deltaZ = toCenterZ - fromCenterZ;
+
+        if (Mathf.Abs(deltaZ) > Mathf.Abs(deltaX))
         {
-            case 0: return new Vector3Int(x + w / 2, y, z + d - 1); // North
-            case 1: return new Vector3Int(x + w / 2, y, z);          // South
-            case 2: return new Vector3Int(x + w - 1, y, z + d / 2); // East
-            case 3: return new Vector3Int(x, y, z + d / 2);          // West
-            default: return Vector3Int.zero;
+            return deltaZ > 0 ? 0 : 1; // North or South
+        }
+        else
+        {
+            return deltaX > 0 ? 2 : 3; // East or West
+        }
+    }
+
+    // ===================================================================
+    // CARVING INTO WORLD
+    // ===================================================================
+
+    void CarveAllStructures()
+    {
+        Debug.Log("=== Carving structures ===");
+
+        foreach (Structure s in allStructures)
+        {
+            if (s.position == Vector3Int.zero) continue; // Skip unplaced
+
+            // Carve the structure
+            Carve(s.position.x, s.position.y, s.position.z, s.width, s.height, s.depth,
+                  s.wallValue, s.interiorValue);
+
+            // Carve doors and corridors
+            foreach (DoorData door in s.doors)
+            {
+                CarveDoor(s.position.x, s.position.y, s.position.z, s.width, s.depth, door.direction);
+
+                Structure connected = allStructures[door.connectsToStructureId];
+                if (connected.position == Vector3Int.zero) continue;
+
+                Vector3Int doorPos1 = GetDoorPosition(s.position.x, s.position.y, s.position.z, s.width, s.depth, door.direction);
+                int oppDir = GetOppositeDirection(door.direction);
+                Vector3Int doorPos2 = GetDoorPosition(connected.position.x, connected.position.y, connected.position.z, connected.width, connected.depth, oppDir);
+
+                CarveDirectConnection(doorPos1, doorPos2);
+            }
+        }
+    }
+
+    void Carve(int x, int y, int z, int w, int h, int d, int wallValue, int interiorValue)
+    {
+        for (int ix = x; ix < x + w; ix++)
+        {
+            for (int iy = y; iy < y + h; iy++)
+            {
+                for (int iz = z; iz < z + d; iz++)
+                {
+                    if (IsInBounds(new Vector3Int(ix, iy, iz)))
+                    {
+                        bool isWall = (ix == x || ix == x + w - 1 ||
+                                       iz == z || iz == z + d - 1 ||
+                                       iy == y + h - 1);
+
+                        GreenFieldData[ix, iy, iz] = isWall ? wallValue : interiorValue;
+                    }
+                }
+            }
         }
     }
 
@@ -417,25 +559,20 @@ public class UrbanPlanner : GreenField
         }
     }
 
-    // ===================================================================
-    // DOOR CONNECTION (NO PATHFINDING!)
-    // ===================================================================
-
-    void ConnectDoorToStructure(DoorNode parentDoor, Vector3Int childPos, int childW, int childD)
+    Vector3Int GetDoorPosition(int x, int y, int z, int w, int d, int direction)
     {
-        // Find the matching door on the child structure
-        int childDirection = GetOppositeDirection(parentDoor.direction);
-        Vector3Int childDoor = GetDoorPosition(childPos.x, childPos.y, childPos.z, childW, childD, childDirection);
-
-        // Carve direct connection
-        CarveDirectConnection(parentDoor.position, childDoor);
-
-        Debug.Log($"Connected door at {parentDoor.position} to {childDoor}");
+        switch (direction)
+        {
+            case 0: return new Vector3Int(x + w / 2, y, z + d - 1); // North
+            case 1: return new Vector3Int(x + w / 2, y, z);          // South
+            case 2: return new Vector3Int(x + w - 1, y, z + d / 2); // East
+            case 3: return new Vector3Int(x, y, z + d / 2);          // West
+            default: return Vector3Int.zero;
+        }
     }
 
     void CarveDirectConnection(Vector3Int from, Vector3Int to)
     {
-        // This should be a very short distance (just the connectionBuffer)
         int steps = Mathf.Max(Mathf.Abs(to.x - from.x), Mathf.Abs(to.z - from.z));
 
         for (int i = 0; i <= steps; i++)
@@ -461,47 +598,22 @@ public class UrbanPlanner : GreenField
     }
 
     // ===================================================================
-    // STRUCTURE CARVING
-    // ===================================================================
-
-    void Carve(int x, int y, int z, int w, int h, int d, int wallValue, int interiorValue)
-    {
-        for (int ix = x; ix < x + w; ix++)
-        {
-            for (int iy = y; iy < y + h; iy++)
-            {
-                for (int iz = z; iz < z + d; iz++)
-                {
-                    if (IsInBounds(new Vector3Int(ix, iy, iz)))
-                    {
-                        bool isWall = (ix == x || ix == x + w - 1 ||
-                                       iz == z || iz == z + d - 1 ||
-                                       iy == y + h - 1);
-
-                        GreenFieldData[ix, iy, iz] = isWall ? wallValue : interiorValue;
-                    }
-                }
-            }
-        }
-    }
-
-    // ===================================================================
     // UTILITY FUNCTIONS
     // ===================================================================
 
     void FindPlayerSpawnPosition()
     {
-        if (allRooms.Count == 0)
+        if (allStructures.Count == 0)
         {
             playerSpawnPosition = new Vector3(width / 2, 2, depth / 2);
             return;
         }
 
-        RoomBounds spawnRoom = allRooms[0]; // Spawn in seed room
+        Structure spawnRoom = allStructures[0]; // Spawn in first structure
         playerSpawnPosition = new Vector3(
-            (spawnRoom.minX + spawnRoom.maxX) / 2f,
-            spawnRoom.minY + 0.5f,
-            (spawnRoom.minZ + spawnRoom.maxZ) / 2f
+            spawnRoom.position.x + spawnRoom.width / 2f,
+            spawnRoom.position.y + 0.5f,
+            spawnRoom.position.z + spawnRoom.depth / 2f
         );
 
         Debug.Log($"Player spawn: {playerSpawnPosition}");
@@ -532,13 +644,14 @@ public class UrbanPlanner : GreenField
     }
 
     // ===================================================================
-    // GIZMO VISUALIZATION
+    // GIZMO VISUALIZATION (Debug)
     // ===================================================================
 
     void OnDrawGizmos()
     {
         if (GreenFieldData == null) return;
 
+        // Draw voxel data
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -550,39 +663,88 @@ public class UrbanPlanner : GreenField
                     switch (GreenFieldData[x, y, z])
                     {
                         case 2: // Room interior
-                            //Gizmos.color = new Color(1, 0, 0, 0.3f);
+                           //; Gizmos.color = new Color(1, 0, 0, 0.3f);
                             //Gizmos.DrawCube(pos, Vector3.one * 0.6f);
                             break;
                         case 3: // Room walls
-                          //  Gizmos.color = new Color(1, 1, 0, 0.5f);
-                           // Gizmos.DrawCube(pos, Vector3.one * 0.85f);
+                           // Gizmos.color = new Color(1, 1, 0, 0.5f);
+                            //Gizmos.DrawCube(pos, Vector3.one * 0.85f);
                             break;
                         case 5: // Doors
                            // Gizmos.color = Color.magenta;
-                           // Gizmos.DrawCube(pos, Vector3.one * 0.7f);
+                            //Gizmos.DrawCube(pos, Vector3.one * 0.7f);
                             break;
                         case 6: // Hallway interior
                            // Gizmos.color = Color.cyan;
                            // Gizmos.DrawCube(pos, Vector3.one * 0.6f);
                             break;
                         case 7: // Hallway walls
-                            //Gizmos.color = new Color(0, 0.5f, 1, 0.5f);
+                           // Gizmos.color = new Color(0, 0.5f, 1, 0.5f);
                            // Gizmos.DrawCube(pos, Vector3.one * 0.85f);
                             break;
                         case 8: // Corridors
                            // Gizmos.color = new Color(0, 1, 0, 0.6f);
-                            //Gizmos.DrawCube(pos, Vector3.one * 0.5f);
+                           // Gizmos.DrawCube(pos, Vector3.one * 0.5f);
                             break;
                     }
                 }
             }
         }
 
-        // Draw door nodes
-        foreach (DoorNode door in allDoors)
+        // Draw structure bounds and connections
+        if (allStructures != null)
         {
-           // Gizmos.color = door.isUsed ? Color.red : Color.green;
-           // Gizmos.DrawSphere(door.position, 0.3f);
+            foreach (Structure s in allStructures)
+            {
+                if (s.position == Vector3Int.zero) continue;
+
+                // Draw structure bounding box
+                Vector3 center = new Vector3(
+                    s.position.x + s.width / 2f,
+                    s.position.y + s.height / 2f,
+                    s.position.z + s.depth / 2f
+                );
+                Vector3 size = new Vector3(s.width, s.height, s.depth);
+
+                // Different colors for different types
+                if (s.type == "Room")
+                    Gizmos.color = new Color(1, 0, 0, 0.3f);
+                else if (s.type == "Hallway")
+                    Gizmos.color = new Color(0, 1, 1, 0.3f);
+                else if (s.type == "BossRoom")
+                    Gizmos.color = new Color(1, 0, 1, 0.3f);
+                else
+                    Gizmos.color = new Color(0, 1, 0, 0.3f);
+
+                Gizmos.DrawWireCube(center, size);
+
+                // Draw connection lines
+                Gizmos.color = Color.yellow;
+                foreach (int connectedId in s.connectedTo)
+                {
+                    if (connectedId < allStructures.Count)
+                    {
+                        Structure connected = allStructures[connectedId];
+                        if (connected.position == Vector3Int.zero) continue;
+
+                        Vector3 connectedCenter = new Vector3(
+                            connected.position.x + connected.width / 2f,
+                            connected.position.y + connected.height / 2f,
+                            connected.position.z + connected.depth / 2f
+                        );
+
+                        Gizmos.DrawLine(center, connectedCenter);
+                    }
+                }
+
+                // Draw doors as spheres
+                Gizmos.color = Color.magenta;
+                foreach (DoorData door in s.doors)
+                {
+                    Vector3Int doorPos = GetDoorPosition(s.position.x, s.position.y, s.position.z, s.width, s.depth, door.direction);
+                    Gizmos.DrawSphere(doorPos, 0.5f);
+                }
+            }
         }
     }
 }
