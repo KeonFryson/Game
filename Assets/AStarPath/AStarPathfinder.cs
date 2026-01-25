@@ -12,6 +12,7 @@ public class AStarPathfinder : MonoBehaviour
     [SerializeField] private LayerMask groundLayerMask; // Renamed: Ground layer to detect
     [SerializeField] private float maxRaycastDistance = 100f; // Max distance to raycast down for ground
     [SerializeField] private float heightAboveGround = 5f; // How many nodes to create above ground level
+    [SerializeField] private float nodeHeightOffset = 0.5f; // How far above ground to place nodes
 
     [Header("Performance")]
     [SerializeField] private int maxIterations = 1000; // Prevent infinite loops
@@ -27,6 +28,8 @@ public class AStarPathfinder : MonoBehaviour
     private int gridSizeX, gridSizeY, gridSizeZ;
     private float gridUpdateTimer = 0f;
     private const float GRID_UPDATE_INTERVAL = 5f;
+    private float minGroundHeight;
+    private float maxGroundHeight;
 
     private void Awake()
     {
@@ -65,6 +68,9 @@ public class AStarPathfinder : MonoBehaviour
         grid = new PathNode[gridSizeX, gridSizeY, gridSizeZ];
         Vector3 worldBottomLeft = transform.position - Vector3.right * gridWorldSize.x / 2 - Vector3.up * gridWorldSize.y / 2 - Vector3.forward * gridWorldSize.z / 2;
 
+        minGroundHeight = float.MaxValue;
+        maxGroundHeight = float.MinValue;
+
         for (int x = 0; x < gridSizeX; x++)
         {
             for (int z = 0; z < gridSizeZ; z++)
@@ -78,8 +84,12 @@ public class AStarPathfinder : MonoBehaviour
 
                 if (Physics.Raycast(rayStart, Vector3.down, out hit, maxRaycastDistance, groundLayerMask))
                 {
-                    // Found ground, create nodes starting from ground level
-                    Vector3 groundPoint = hit.point;
+                    // Found ground, create nodes starting from above ground level
+                    Vector3 groundPoint = hit.point + Vector3.up * nodeHeightOffset;
+
+                    // Track min/max heights for gizmo
+                    if (groundPoint.y < minGroundHeight) minGroundHeight = groundPoint.y;
+                    if (groundPoint.y > maxGroundHeight) maxGroundHeight = groundPoint.y;
 
                     // Create nodes from ground level upward
                     for (int y = 0; y < gridSizeY; y++)
@@ -91,7 +101,7 @@ public class AStarPathfinder : MonoBehaviour
                         {
                             // Check if this position is walkable (not blocked by unwalkable objects)
                             // Use a slightly larger radius for more conservative pathfinding
-                            bool walkable = !Physics.CheckSphere(worldPoint + Vector3.up * nodeRadius, nodeRadius * 1.1f, unwalkableMask);
+                            bool walkable = !Physics.CheckSphere(worldPoint, nodeRadius * 1.1f, unwalkableMask);
                             grid[x, y, z] = new PathNode(walkable, worldPoint, x, y, z, true); // Has ground support
                         }
                         else
@@ -316,9 +326,37 @@ public class AStarPathfinder : MonoBehaviour
         int y = Mathf.RoundToInt((gridSizeY - 1) * percentY);
         int z = Mathf.RoundToInt((gridSizeZ - 1) * percentZ);
 
-        if (x >= 0 && x < gridSizeX && y >= 0 && y < gridSizeY && z >= 0 && z < gridSizeZ)
+        if (x >= 0 && x < gridSizeX && z >= 0 && z < gridSizeZ)
         {
-            return grid[x, y, z];
+            // First, try the calculated node
+            if (y >= 0 && y < gridSizeY && grid[x, y, z] != null && grid[x, y, z].walkable)
+            {
+                return grid[x, y, z];
+            }
+
+            // If calculated node is unwalkable or out of bounds, search for nearest walkable node vertically
+            for (int yOffset = 0; yOffset < gridSizeY; yOffset++)
+            {
+                // Check below first
+                int checkY = y - yOffset;
+                if (checkY >= 0 && checkY < gridSizeY && grid[x, checkY, z] != null && grid[x, checkY, z].walkable && grid[x, checkY, z].hasGroundSupport)
+                {
+                    return grid[x, checkY, z];
+                }
+
+                // Then check above
+                checkY = y + yOffset;
+                if (checkY >= 0 && checkY < gridSizeY && grid[x, checkY, z] != null && grid[x, checkY, z].walkable && grid[x, checkY, z].hasGroundSupport)
+                {
+                    return grid[x, checkY, z];
+                }
+            }
+
+            // Fallback: return the originally calculated node even if unwalkable (pathfinding will handle it)
+            if (y >= 0 && y < gridSizeY)
+            {
+                return grid[x, y, z];
+            }
         }
 
         return null;
@@ -328,7 +366,24 @@ public class AStarPathfinder : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        Gizmos.DrawWireCube(transform.position, gridWorldSize);
+        // Draw grid box that matches the single layer of nodes
+        if (grid != null && minGroundHeight != float.MaxValue && maxGroundHeight != float.MinValue)
+        {
+            // Calculate the actual height of the node layer
+            float layerHeight = nodeDiameter;
+            float centerY = (minGroundHeight + maxGroundHeight) / 2f;
+
+            Vector3 boxSize = new Vector3(gridWorldSize.x, layerHeight, gridWorldSize.z);
+            Vector3 boxCenter = new Vector3(transform.position.x, centerY, transform.position.z);
+
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireCube(boxCenter, boxSize);
+        }
+        else
+        {
+            // Fallback to original box if grid not yet created
+            Gizmos.DrawWireCube(transform.position, gridWorldSize);
+        }
 
         if (grid != null && displayGridGizmos)
         {

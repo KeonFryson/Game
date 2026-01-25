@@ -7,7 +7,7 @@ public class InventoryManger : MonoBehaviour
 {
     public GameObject slotPrefab;
 
-    public List<InventorySlot> inventorySlots = new List<InventorySlot>(4);
+    public List<InventorySlot> inventorySlots;
 
     private int currentSelectedSlot = 0;
     private InputSystem_Actions inputActions;
@@ -15,8 +15,12 @@ public class InventoryManger : MonoBehaviour
     public PlayerMovement playerController;
     public SpellCastingManager spellCastingManager; // Add reference to spell manager
 
+    public int inventorySize = 4;
+
     private void Awake()
     {
+
+        inventorySlots = new List<InventorySlot>(inventorySize);
         inputActions = new InputSystem_Actions();
         inventory = GetComponent<Inventroy>();
         playerController = GetComponent<PlayerMovement>();
@@ -32,7 +36,27 @@ public class InventoryManger : MonoBehaviour
         }
         if (spellCastingManager == null)
         {
-            spellCastingManager = FindFirstObjectByType<SpellCastingManager>();
+            // Search specifically for player's SpellCastingManager
+            SpellCastingManager[] allManagers = FindObjectsByType<SpellCastingManager>(FindObjectsSortMode.None);
+            foreach (SpellCastingManager manager in allManagers)
+            {
+                // Only use the one that has PlayerMovement (i.e., is on the player)
+                if (manager.GetComponent<PlayerMovement>() != null)
+                {
+                    spellCastingManager = manager;
+                    Debug.Log($"[InventoryManger] Found player's SpellCastingManager on {manager.gameObject.name}");
+                    break;
+                }
+            }
+
+            if (spellCastingManager == null)
+            {
+                Debug.LogError("[InventoryManger] Could not find player's SpellCastingManager!");
+            }
+        }
+        else
+        {
+            Debug.Log($"[InventoryManger] Using SpellCastingManager from {spellCastingManager.gameObject.name}");
         }
     }
 
@@ -131,7 +155,7 @@ public class InventoryManger : MonoBehaviour
 
     void UpdateSlotSelection()
     {
-        if (playerController.isDead)
+        if (playerController != null && playerController.isDead)
             return;
 
         for (int i = 0; i < inventorySlots.Count; i++)
@@ -140,39 +164,76 @@ public class InventoryManger : MonoBehaviour
         }
     }
 
+    [Header("Debug")]
+    [SerializeField] private bool enableCooldownDebug = false; // Add this field to toggle debug
+
     void UpdateCooldownVisuals()
     {
-        if (spellCastingManager == null || inventory == null || inventory.inventory == null)
+        // Early exit if required references are missing
+        if (spellCastingManager == null || inventory == null || inventory.inventory == null || inventorySlots == null)
+        {
+            if (enableCooldownDebug)
+            {
+                Debug.LogWarning($"[InventoryManger] UpdateCooldownVisuals: Missing references - " +
+                               $"spellCastingManager:{spellCastingManager != null}, " +
+                               $"inventory:{inventory != null}, " +
+                               $"inventory.inventory:{inventory?.inventory != null}, " +
+                               $"inventorySlots:{inventorySlots != null}");
+            }
             return;
+        }
+
+        // Cache the inventory count to avoid repeated property access
+        int inventoryCount = inventory.inventory.Count;
 
         for (int i = 0; i < inventorySlots.Count; i++)
         {
-            if (i < inventory.inventory.Count)
+            // Default to no cooldown
+            float cooldownPercent = 0f;
+
+            // Only check cooldown if slot has an item
+            if (i < inventoryCount)
             {
                 InventoryItem item = inventory.inventory[i];
 
+                // Check if item exists and is a spell
                 if (item != null && item.item != null && item.item.isSpell)
                 {
-                    float remainingCooldown = spellCastingManager.GetSpellCooldownRemaining(item.item.itemID);
+                    float remainingCooldown = spellCastingManager.GetSlotCooldownRemaining(i);
                     float totalCooldown = item.item.spellCooldown;
 
                     // Calculate percentage (1 = full cooldown, 0 = ready)
-                    float cooldownPercent = totalCooldown > 0 ? remainingCooldown / totalCooldown : 0f;
+                    if (totalCooldown > 0f)
+                    {
+                        cooldownPercent = Mathf.Clamp01(remainingCooldown / totalCooldown);
 
-                    inventorySlots[i].UpdateCooldown(cooldownPercent);
-                }
-                else
-                {
-                    // Not a spell, no cooldown
-                    inventorySlots[i].UpdateCooldown(0f);
+                        // Only log when there's an active cooldown
+                        if (enableCooldownDebug && cooldownPercent > 0f)
+                        {
+                            Debug.Log($"[InventoryManger] Slot {i}: '{item.item.itemName}' | " +
+                                    $"Remaining: {remainingCooldown:F2}s / {totalCooldown:F2}s | " +
+                                    $"Percent: {cooldownPercent * 100f:F1}%");
+                        }
+                    }
+                    else if (enableCooldownDebug)
+                    {
+                        Debug.LogWarning($"[InventoryManger] Slot {i}: Spell '{item.item.itemName}' has invalid totalCooldown: {totalCooldown}");
+                    }
                 }
             }
-            else
+
+            // Update the visual regardless (either with cooldown or 0)
+            if (inventorySlots[i] != null)
             {
-                inventorySlots[i].UpdateCooldown(0f);
+                inventorySlots[i].UpdateCooldown(cooldownPercent);
+            }
+            else if (enableCooldownDebug)
+            {
+                Debug.LogError($"[InventoryManger] Slot {i}: InventorySlot component is null!");
             }
         }
     }
+
 
     void InitializeHotbar()
     {
@@ -181,14 +242,21 @@ public class InventoryManger : MonoBehaviour
         {
             GameObject slotInstance = Instantiate(slotPrefab, this.transform);
             InventorySlot slot = slotInstance.GetComponent<InventorySlot>();
-            slot.ClearSlot();
-            inventorySlots.Add(slot);
+            if (slot != null)
+            {
+                slot.ClearSlot();
+                inventorySlots.Add(slot);
+            }
+            else
+            {
+                Debug.LogError($"Slot prefab at index {i} is missing InventorySlot component!");
+            }
         }
     }
 
     void DrawHotbar(List<InventoryItem> currentInventory)
     {
-        if (currentInventory == null) return;
+        if (currentInventory == null || inventorySlots == null) return;
 
         for (int i = 0; i < inventorySlots.Count; i++)
         {
@@ -205,9 +273,14 @@ public class InventoryManger : MonoBehaviour
 
     void ResetInventory()
     {
+        if (inventorySlots == null) return;
+
         foreach (InventorySlot slot in inventorySlots)
         {
-            slot.ClearSlot();
+            if (slot != null)
+            {
+                slot.ClearSlot();
+            }
         }
     }
 

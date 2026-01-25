@@ -24,7 +24,7 @@ MonoBehaviour:
   healingAmount: 0
   isSpell: 1
   manaCost: 10
-  spellChannelTime: 1
+  spellChannelTime: 2
   spellCooldown: 1
   spellSpeed: 20
   spellEffectPrefab: {fileID: 6554216268635952692, guid: 2ee9af64ed65e744da350051166f31ec, type: 3}

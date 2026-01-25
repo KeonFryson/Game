@@ -25,9 +25,9 @@ public class SpellCastingManager : MonoBehaviour
     [SerializeField] private LayerMask aimLayerMask = ~0; // Aim at everything by default
 
     [Header("Stats")]
-    [SerializeField] private int maxMana = 100;
+    [SerializeField] private float maxMana = 100;
     [SerializeField] private float manaRegenRate = 5f;
-    private int currentMana;
+    [SerializeField] private float currentMana;
 
     [Header("Spell Settings")]
     [SerializeField] private float globalCooldownTime = 0.5f;
@@ -40,28 +40,35 @@ public class SpellCastingManager : MonoBehaviour
     [SerializeField] private float chargeEffectRadius = 2f;
     [SerializeField] private float minChannelPercentForCast = 0.1f;
 
+    // Changed: Track cooldowns by slot index instead of spell ID
+    private Dictionary<int, float> slotCooldowns = new Dictionary<int, float>();
+
+    // Added: For AI enemies, track spell ID cooldowns since they don't use slots
     private Dictionary<int, float> spellCooldowns = new Dictionary<int, float>();
+
     private InputSystem_Actions inputActions;
 
     // Channeling state
     private bool isChanneling = false;
     private float channelTimer = 0f;
     private ItemData channelingSpell = null;
+    private int channelingSlotIndex = -1; // Track which slot is channeling
     private GameObject channelEffectInstance = null;
     private GameObject chargeEffectInstance = null;
     private Vector3 originalEffectScale = Vector3.one;
 
-    public delegate void ManaChangedDelegate(int currentMana, int maxMana);
-    public static event ManaChangedDelegate OnManaChanged;
+    // Changed: Made events non-static (instance-based)
+    public delegate void ManaChangedDelegate(float currentMana, float maxMana);
+    public event ManaChangedDelegate OnManaChanged;
 
     public delegate void SpellCastDelegate(ItemData spell);
-    public static event SpellCastDelegate OnSpellCast;
+    public event SpellCastDelegate OnSpellCast;
 
     public delegate void SpellChannelDelegate(ItemData spell, float progress);
-    public static event SpellChannelDelegate OnSpellChannelStart;
-    public static event SpellChannelDelegate OnSpellChannelUpdate;
-    public static event SpellChannelDelegate OnSpellChannelComplete;
-    public static event SpellChannelDelegate OnSpellChannelInterrupted;
+    public event SpellChannelDelegate OnSpellChannelStart;
+    public event SpellChannelDelegate OnSpellChannelUpdate;
+    public event SpellChannelDelegate OnSpellChannelComplete;
+    public event SpellChannelDelegate OnSpellChannelInterrupted;
 
     [SerializeField] public TMPro.TextMeshProUGUI manaText;
 
@@ -185,8 +192,19 @@ public class SpellCastingManager : MonoBehaviour
             globalCooldownTimer -= Time.deltaTime;
         }
 
-        List<int> keysToUpdate = new List<int>(spellCooldowns.Keys);
-        foreach (int spellID in keysToUpdate)
+        // Update slot cooldowns (for player)
+        List<int> slotKeysToUpdate = new List<int>(slotCooldowns.Keys);
+        foreach (int slotIndex in slotKeysToUpdate)
+        {
+            if (slotCooldowns[slotIndex] > 0f)
+            {
+                slotCooldowns[slotIndex] -= Time.deltaTime;
+            }
+        }
+
+        // Update spell ID cooldowns (for AI)
+        List<int> spellKeysToUpdate = new List<int>(spellCooldowns.Keys);
+        foreach (int spellID in spellKeysToUpdate)
         {
             if (spellCooldowns[spellID] > 0f)
             {
@@ -248,7 +266,7 @@ public class SpellCastingManager : MonoBehaviour
     {
         if (currentMana < maxMana && !isChanneling)
         {
-            currentMana = Mathf.Min(currentMana + Mathf.RoundToInt(manaRegenRate * Time.deltaTime), maxMana);
+            currentMana = Mathf.Min(currentMana +  manaRegenRate * Time.deltaTime, maxMana);
             OnManaChanged?.Invoke(currentMana, maxMana);
         }
     }
@@ -268,11 +286,7 @@ public class SpellCastingManager : MonoBehaviour
         return castPoint.position + castPoint.TransformDirection(spell.spellCastPointOffset);
     }
 
-    private Quaternion GetSpellSpawnRotation(ItemData spell)
-    {
-        Transform castPoint = GetSpellCastPoint(spell);
-        return castPoint.rotation;
-    }
+
 
     /// <summary>
     /// Get the direction to aim the spell based on crosshair position (screen center)
@@ -307,65 +321,7 @@ public class SpellCastingManager : MonoBehaviour
         return direction;
     }
 
-    public void OnDrawGizmos()
-    {
-        if (!enableDebug || aimCamera == null || spellCastPoint == null)
-            return;
 
-        // Draw the raycast from camera
-        Ray ray = aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-        Vector3 targetPoint;
-        bool didHit = false;
-
-        if (Physics.Raycast(ray, out RaycastHit hit, maxAimDistance, aimLayerMask))
-        {
-            // Hit something
-            targetPoint = hit.point;
-            didHit = true;
-
-            // Draw camera ray to hit point in green
-            Gizmos.color = Color.green;
-            Gizmos.DrawLine(ray.origin, hit.point);
-
-            // Draw hit point as a sphere
-            Gizmos.color = Color.red;
-            Gizmos.DrawSphere(hit.point, 0.1f);
-
-            // Draw hit normal
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(hit.point, hit.point + hit.normal * 0.5f);
-        }
-        else
-        {
-            // Nothing hit, aim at max distance
-            targetPoint = ray.GetPoint(maxAimDistance);
-            didHit = false;
-
-            // Draw camera ray to max distance in cyan
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawLine(ray.origin, targetPoint);
-
-            // Draw end point
-            Gizmos.color = Color.white;
-            Gizmos.DrawSphere(targetPoint, 0.2f);
-        }
-
-        // Draw spell direction from cast point to target
-        Vector3 direction = (targetPoint - spellCastPoint.position).normalized;
-        Gizmos.color = didHit ? Color.blue : Color.magenta;
-        Gizmos.DrawLine(spellCastPoint.position, spellCastPoint.position + direction * 3f);
-        Gizmos.DrawSphere(spellCastPoint.position, 0.15f);
-
-        // Draw arrow head for direction
-        Vector3 arrowTip = spellCastPoint.position + direction * 3f;
-        Vector3 right = Vector3.Cross(direction, Vector3.up).normalized * 0.2f;
-        Vector3 up = Vector3.Cross(right, direction).normalized * 0.2f;
-
-        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + right);
-        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - right);
-        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + up);
-        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - up);
-    }
 
     // PUBLIC API: Player uses this (via inventory selection)
     public bool TryStartCastSpell()
@@ -394,7 +350,8 @@ public class SpellCastingManager : MonoBehaviour
             return false;
         }
 
-        return StartCastSpell(currentItem.item);
+        // Changed: Pass slot index to spell casting
+        return StartCastSpell(currentItem.item, selectedSlot);
     }
 
     // PUBLIC API: AI uses this (direct spell casting)
@@ -414,7 +371,8 @@ public class SpellCastingManager : MonoBehaviour
             spellCastPoint = customCastPoint;
         }
 
-        bool result = StartCastSpell(spell);
+        // Changed: AI uses spell ID for cooldowns, pass -1 for slot to indicate AI casting
+        bool result = StartCastSpell(spell, -1);
 
         // Restore original cast point
         if (originalCastPoint != null)
@@ -443,28 +401,31 @@ public class SpellCastingManager : MonoBehaviour
         }
     }
 
-    private bool StartCastSpell(ItemData spell)
+    // Changed: Add slotIndex parameter
+    private bool StartCastSpell(ItemData spell, int slotIndex)
     {
-        if (!CanCastSpell(spell))
+        if (!CanCastSpell(spell, slotIndex))
         {
             return false;
         }
 
         if (spell.spellChannelTime > 0f)
         {
-            StartChanneling(spell);
+            StartChanneling(spell, slotIndex);
             return true;
         }
         else
         {
-            return ExecuteSpell(spell);
+            return ExecuteSpell(spell, slotIndex);
         }
     }
 
-    private void StartChanneling(ItemData spell)
+    // Changed: Add slotIndex parameter
+    private void StartChanneling(ItemData spell, int slotIndex)
     {
         isChanneling = true;
         channelingSpell = spell;
+        channelingSlotIndex = slotIndex;
         channelTimer = 0f;
 
         currentMana -= spell.manaCost;
@@ -527,8 +488,10 @@ public class SpellCastingManager : MonoBehaviour
         if (!isChanneling || channelingSpell == null) return;
 
         ItemData spell = channelingSpell;
+        int slotIndex = channelingSlotIndex;
         isChanneling = false;
         channelingSpell = null;
+        channelingSlotIndex = -1;
         channelTimer = 0f;
 
         if (!canMoveWhileChanneling && movementController != null)
@@ -537,7 +500,18 @@ public class SpellCastingManager : MonoBehaviour
         }
 
         globalCooldownTimer = globalCooldownTime;
-        spellCooldowns[spell.itemID] = spell.spellCooldown;
+
+        // Changed: Set cooldown based on whether this is player (slot) or AI (spell ID)
+        if (slotIndex >= 0)
+        {
+            // Player casting - use slot cooldown
+            slotCooldowns[slotIndex] = spell.spellCooldown;
+        }
+        else
+        {
+            // AI casting - use spell ID cooldown
+            spellCooldowns[spell.itemID] = spell.spellCooldown;
+        }
 
         if (channelEffectInstance != null)
         {
@@ -605,6 +579,7 @@ public class SpellCastingManager : MonoBehaviour
 
         isChanneling = false;
         channelingSpell = null;
+        channelingSlotIndex = -1;
         channelTimer = 0f;
 
         if (!canMoveWhileChanneling && movementController != null)
@@ -632,13 +607,25 @@ public class SpellCastingManager : MonoBehaviour
         if (enableDebug) Debug.Log($"Interrupted channeling: {spell.itemName} at {progress * 100f:F1}% - Mana refunded");
     }
 
-    private bool ExecuteSpell(ItemData spell)
+    // Changed: Add slotIndex parameter
+    private bool ExecuteSpell(ItemData spell, int slotIndex)
     {
         currentMana -= spell.manaCost;
         OnManaChanged?.Invoke(currentMana, maxMana);
 
         globalCooldownTimer = globalCooldownTime;
-        spellCooldowns[spell.itemID] = spell.spellCooldown;
+
+        // Changed: Set cooldown based on whether this is player (slot) or AI (spell ID)
+        if (slotIndex >= 0)
+        {
+            // Player casting - use slot cooldown
+            slotCooldowns[slotIndex] = spell.spellCooldown;
+        }
+        else
+        {
+            // AI casting - use spell ID cooldown
+            spellCooldowns[spell.itemID] = spell.spellCooldown;
+        }
 
         CastSpellEffect(spell);
         OnSpellCast?.Invoke(spell);
@@ -646,7 +633,8 @@ public class SpellCastingManager : MonoBehaviour
         return true;
     }
 
-    private bool CanCastSpell(ItemData spell)
+    // Changed: Add slotIndex parameter
+    private bool CanCastSpell(ItemData spell, int slotIndex)
     {
         if (isChanneling)
         {
@@ -660,10 +648,24 @@ public class SpellCastingManager : MonoBehaviour
             return false;
         }
 
-        if (spellCooldowns.ContainsKey(spell.itemID) && spellCooldowns[spell.itemID] > 0f)
+        // Changed: Check cooldown based on whether this is player (slot) or AI (spell ID)
+        if (slotIndex >= 0)
         {
-            if (enableDebug) Debug.Log($"{spell.itemName} is on cooldown: {spellCooldowns[spell.itemID]:F1}s remaining");
-            return false;
+            // Player casting - check slot cooldown
+            if (slotCooldowns.ContainsKey(slotIndex) && slotCooldowns[slotIndex] > 0f)
+            {
+                if (enableDebug) Debug.Log($"{spell.itemName} in slot {slotIndex} is on cooldown: {slotCooldowns[slotIndex]:F1}s remaining");
+                return false;
+            }
+        }
+        else
+        {
+            // AI casting - check spell ID cooldown
+            if (spellCooldowns.ContainsKey(spell.itemID) && spellCooldowns[spell.itemID] > 0f)
+            {
+                if (enableDebug) Debug.Log($"{spell.itemName} (ID: {spell.itemID}) is on cooldown: {spellCooldowns[spell.itemID]:F1}s remaining");
+                return false;
+            }
         }
 
         if (currentMana < spell.manaCost)
@@ -718,6 +720,25 @@ public class SpellCastingManager : MonoBehaviour
         OnManaChanged?.Invoke(currentMana, maxMana);
     }
 
+    // Changed: Get cooldown for a specific slot
+    public float GetSlotCooldownRemaining(int slotIndex)
+    {
+        if (slotCooldowns.ContainsKey(slotIndex))
+        {
+            return Mathf.Max(0f, slotCooldowns[slotIndex]);
+        }
+        return 0f;
+    }
+
+    // Changed: Get cooldown percentage for a specific slot (for UI)
+    public float GetSlotCooldownPercent(int slotIndex, float maxCooldown)
+    {
+        if (maxCooldown <= 0f) return 0f;
+        float remaining = GetSlotCooldownRemaining(slotIndex);
+        return Mathf.Clamp01(remaining / maxCooldown);
+    }
+
+    // Added: Get spell cooldown for AI enemies
     public float GetSpellCooldownRemaining(int spellID)
     {
         if (spellCooldowns.ContainsKey(spellID))
@@ -743,17 +764,17 @@ public class SpellCastingManager : MonoBehaviour
         return channelTimer / channelingSpell.spellChannelTime;
     }
 
-    public int GetCurrentMana()
+    public float GetCurrentMana()
     {
         return currentMana;
     }
 
-    public int GetMaxMana()
+    public float GetMaxMana()
     {
         return maxMana;
     }
 
-    public void SetMaxMana(int newMaxMana)
+    public void SetMaxMana(float newMaxMana)
     {
         maxMana = newMaxMana;
         currentMana = Mathf.Min(currentMana, maxMana);
@@ -768,5 +789,65 @@ public class SpellCastingManager : MonoBehaviour
     public void SetAimCamera(Camera camera)
     {
         aimCamera = camera;
+    }
+
+    public void OnDrawGizmos()
+    {
+        if (!enableDebug || aimCamera == null || spellCastPoint == null)
+            return;
+
+        // Draw the raycast from camera
+        Ray ray = aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
+        Vector3 targetPoint;
+        bool didHit = false;
+
+        if (Physics.Raycast(ray, out RaycastHit hit, maxAimDistance, aimLayerMask))
+        {
+            // Hit something
+            targetPoint = hit.point;
+            didHit = true;
+
+            // Draw camera ray to hit point in green
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(ray.origin, hit.point);
+
+            // Draw hit point as a sphere
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(hit.point, 0.1f);
+
+            // Draw hit normal
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(hit.point, hit.point + hit.normal * 0.5f);
+        }
+        else
+        {
+            // Nothing hit, aim at max distance
+            targetPoint = ray.GetPoint(maxAimDistance);
+            didHit = false;
+
+            // Draw camera ray to max distance in cyan
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(ray.origin, targetPoint);
+
+            // Draw end point
+            Gizmos.color = Color.white;
+            Gizmos.DrawSphere(targetPoint, 0.2f);
+        }
+
+        // Draw spell direction from cast point to target
+        Vector3 direction = (targetPoint - spellCastPoint.position).normalized;
+        Gizmos.color = didHit ? Color.blue : Color.magenta;
+        Gizmos.DrawLine(spellCastPoint.position, spellCastPoint.position + direction * 3f);
+        Gizmos.DrawSphere(spellCastPoint.position, 0.15f);
+
+        // Draw arrow head for direction
+        Vector3 arrowTip = spellCastPoint.position + direction * 3f;
+        Vector3 right = Vector3.Cross(direction, Vector3.up).normalized * 0.2f;
+        Vector3 up = Vector3.Cross(right, direction).normalized * 0.2f;
+
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + right);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - right);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f + up);
+        Gizmos.DrawLine(arrowTip, arrowTip - direction * 0.3f - up);
     }
 }

@@ -10,10 +10,11 @@ public abstract class Enemy : MonoBehaviour
     [SerializeField] protected LayerMask obstacleLayers;
 
     [Header("Movement Settings")]
-    [SerializeField] protected float moveSpeed = 3f;
-    [SerializeField] protected float rotationSpeed = 5f;
+    [SerializeField] protected float moveSpeed = 4.5f;
+    [SerializeField] protected float rotationSpeed = 8f;
     [SerializeField] protected float stopDistance = 0.5f;
-    [SerializeField] protected float waypointReachedDistance = 0.5f;
+    [SerializeField] protected float waypointReachedDistance = 1f;
+
     protected Rigidbody rb;
 
     [Header("Pathfinding Settings")]
@@ -24,7 +25,7 @@ public abstract class Enemy : MonoBehaviour
     protected int currentWaypointIndex;
 
     [Header("Random Walking Settings")]
-    [SerializeField] protected float randomWalkSpeed = 1.5f;
+    [SerializeField] protected float randomWalkSpeed = 2f;
     [SerializeField] protected float randomWalkRadius = 5f;
     [SerializeField] protected float idleTimeMin = 1f;
     [SerializeField] protected float idleTimeMax = 3f;
@@ -39,7 +40,7 @@ public abstract class Enemy : MonoBehaviour
 
     [Header("AI Settings")]
     [SerializeField] protected bool isAIEnabled = true;
-    [SerializeField] protected float playerLostTimeout = 60f; // Time before giving up on last known position
+    [SerializeField] protected float playerLostTimeout = 60f;
 
     [Header("References")]
     [SerializeField] protected Transform detectionTransform;
@@ -49,19 +50,27 @@ public abstract class Enemy : MonoBehaviour
     protected bool playerInPursuitMode;
     protected Vector3 lastKnownPlayerPosition;
     protected bool hasLastKnownPosition;
-    protected float timeSincePlayerSeen; // Timer tracking how long since player was last seen
+    protected float timeSincePlayerSeen;
     protected Animator animator;
     protected bool isDead;
+
     [SerializeField] protected bool isDebugging = false;
-    // Cached values for optimization
-    private float detectionRangeSqr;
-    private float waypointReachedDistanceSqr;
-    private float cosDetectionAngle;
+
+    protected float detectionRangeSqr;
+    protected float waypointReachedDistanceSqr;
+    protected float cosDetectionAngle;
 
     protected virtual void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
         rb.freezeRotation = true;
+        rb.linearDamping = 0f;
+        rb.angularDamping = 0f;
+        rb.interpolation = RigidbodyInterpolation.None;
+        rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+        rb.mass = 1f;
+
         animator = GetComponent<Animator>();
 
         if (detectionTransform == null)
@@ -72,7 +81,6 @@ public abstract class Enemy : MonoBehaviour
             detectionTransform = obj.transform;
         }
 
-        // Cache squared distances to avoid expensive sqrt operations
         detectionRangeSqr = detectionRange * detectionRange;
         waypointReachedDistanceSqr = waypointReachedDistance * waypointReachedDistance;
         cosDetectionAngle = Mathf.Cos(detectionAngle * Mathf.Deg2Rad);
@@ -100,24 +108,22 @@ public abstract class Enemy : MonoBehaviour
             playerInPursuitMode = true;
             lastKnownPlayerPosition = player.position;
             hasLastKnownPosition = true;
-            timeSincePlayerSeen = 0f; // Reset timer when player is seen
+            timeSincePlayerSeen = 0f;
         }
         else if (playerInPursuitMode)
         {
             playerInPursuitMode = false;
         }
 
-        // Increment timer when player is not detected
         if (!playerDetected && hasLastKnownPosition)
         {
             timeSincePlayerSeen += Time.deltaTime;
 
-            // After timeout, give up on last known position and return to random walking
             if (timeSincePlayerSeen >= playerLostTimeout)
             {
                 hasLastKnownPosition = false;
                 timeSincePlayerSeen = 0f;
-                SetNewRandomWalkTarget(); // Start new random walk immediately
+                SetNewRandomWalkTarget();
             }
         }
 
@@ -157,23 +163,18 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual bool IsPlayerInDetectionCone()
     {
-        // Calculate direction and squared distance in one operation
         Vector3 direction = player.position - transform.position;
-        float distanceSqr = direction.sqrMagnitude;
+        float distSqr = direction.sqrMagnitude;
 
-        // Early exit: check squared distance first (no sqrt needed)
-        if (distanceSqr > detectionRangeSqr) return false;
+        if (distSqr > detectionRangeSqr) return false;
 
-        // Normalize direction only once for both angle check and raycast
-        float distance = Mathf.Sqrt(distanceSqr);
-        direction /= distance; // Manual normalization using already calculated magnitude
+        float dist = Mathf.Sqrt(distSqr);
+        direction /= dist;
 
-        // Use dot product instead of Vector3.Angle (more efficient)
-        float dot = Vector3.Dot(detectionTransform.forward, direction);
-        if (dot < cosDetectionAngle) return false;
+        if (Vector3.Dot(detectionTransform.forward, direction) < cosDetectionAngle)
+            return false;
 
-        // Final raycast check (most expensive, so done last)
-        if (Physics.Raycast(transform.position, direction, distance, obstacleLayers))
+        if (Physics.Raycast(transform.position, direction, dist, obstacleLayers))
             return false;
 
         return true;
@@ -183,33 +184,24 @@ public abstract class Enemy : MonoBehaviour
     {
         if (speed < 0) speed = moveSpeed;
 
-        // Calculate direction once
-        Vector3 direction = target - transform.position;
+        Vector3 dir = target - transform.position;
+        dir.y = 0f;
 
-        // Check for zero direction early
-        if (direction.sqrMagnitude < 0.001f)
+        if (dir.sqrMagnitude < 0.001f)
         {
             rb.linearVelocity = Vector3.zero;
             return;
         }
 
-        // Normalize for movement
-        direction.Normalize();
-        rb.linearVelocity = direction * speed;
+        dir.Normalize();
+        rb.linearVelocity = dir * speed;
 
-        // Flatten direction for rotation (reuse the same vector)
-        direction.y = 0f;
-
-        // Only rotate if we have a valid horizontal direction
-        if (direction.sqrMagnitude > 0.001f)
-        {
-            direction.Normalize();
-            Quaternion lookRot = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, rotationSpeed * Time.fixedDeltaTime);
-        }
-
-        //animator.SetFloat("moveX", direction.x);
-        //animator.SetFloat("moveZ", direction.z);
+        Quaternion lookRot = Quaternion.LookRotation(dir);
+        transform.rotation = Quaternion.Slerp(
+            transform.rotation,
+            lookRot,
+            rotationSpeed * Time.fixedDeltaTime
+        );
     }
 
     protected virtual void FollowPath()
@@ -220,39 +212,21 @@ public abstract class Enemy : MonoBehaviour
             return;
         }
 
-        Vector3 target = currentPath[currentWaypointIndex];
-
-        // Use squared distance for comparison
-        float distSqr = (transform.position - target).sqrMagnitude;
-
-        if (distSqr <= waypointReachedDistanceSqr)
+        while (currentWaypointIndex < currentPath.Count &&
+               (transform.position - currentPath[currentWaypointIndex]).sqrMagnitude
+               <= waypointReachedDistanceSqr * 4f)
         {
             currentWaypointIndex++;
-
-            // Check if we've reached the end after incrementing
-            if (currentWaypointIndex >= currentPath.Count)
-            {
-                rb.linearVelocity = Vector3.zero;
-                return;
-            }
-
-            // Update target to the new waypoint
-            target = currentPath[currentWaypointIndex];
-            distSqr = (transform.position - target).sqrMagnitude;
         }
 
-        // Look ahead to the next waypoint for smoother movement
-        Vector3 moveTarget = target;
-        if (currentWaypointIndex < currentPath.Count - 1)
+        if (currentWaypointIndex >= currentPath.Count)
         {
-            Vector3 nextWaypoint = currentPath[currentWaypointIndex + 1];
-
-            // If we're close to current waypoint, blend toward the next one
-            if (distSqr <= waypointReachedDistanceSqr * 4f)
-            {
-                moveTarget = Vector3.Lerp(target, nextWaypoint, 0.5f);
-            }
+            rb.linearVelocity = Vector3.zero;
+            return;
         }
+
+        int lookAheadIndex = Mathf.Min(currentWaypointIndex + 1, currentPath.Count - 1);
+        Vector3 moveTarget = currentPath[lookAheadIndex];
 
         MoveTowardsPosition(moveTarget);
     }
@@ -279,7 +253,6 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual void UpdateRandomWalk()
     {
-        // Use squared distance for comparison
         if ((transform.position - randomWalkTarget).sqrMagnitude <= waypointReachedDistanceSqr)
         {
             isWalking = false;
@@ -299,36 +272,22 @@ public abstract class Enemy : MonoBehaviour
         Vector3 target;
 
         if (playerDetected)
-        {
             target = player.position;
-        }
         else if (hasLastKnownPosition)
-        {
             target = lastKnownPlayerPosition;
-        }
         else
         {
-            // Clear path when there's no target
             currentPath = null;
             return;
         }
 
-        if (AStarPathfinder.Instance != null)
-        {
-            List<Vector3> newPath = AStarPathfinder.Instance.FindPath(transform.position, target);
+        List<Vector3> newPath =
+            AStarPathfinder.Instance.FindPath(transform.position, target);
 
-            // Only update path if we got a valid result
-            if (newPath != null && newPath.Count > 0)
-            {
-                currentPath = newPath;
-                currentWaypointIndex = 0;
-            }
-            else if (playerDetected)
-            {
-                // If pathfinding failed but player is detected, clear last known position
-                // to fall back to direct movement
-                hasLastKnownPosition = false;
-            }
+        if (newPath != null && newPath.Count > 0)
+        {
+            currentPath = newPath;
+            currentWaypointIndex = 0;
         }
     }
 
@@ -337,8 +296,6 @@ public abstract class Enemy : MonoBehaviour
         if (isDead) return;
 
         currentHealth -= damage;
-        //animator.SetTrigger("hurt");
-
         if (currentHealth <= 0)
             Die();
     }
@@ -347,7 +304,6 @@ public abstract class Enemy : MonoBehaviour
     {
         isDead = true;
         rb.linearVelocity = Vector3.zero;
-        //animator.SetBool("isDead", true);
         StartCoroutine(DeathCoroutine());
     }
 
@@ -359,7 +315,7 @@ public abstract class Enemy : MonoBehaviour
 
     protected virtual void OnDrawGizmos()
     {
-        if(!isDebugging) return;
+        if (!isDebugging) return;
 
         Transform gizmoTransform = detectionTransform != null ? detectionTransform : transform;
 
@@ -444,5 +400,4 @@ public abstract class Enemy : MonoBehaviour
             Gizmos.DrawLine(transform.position, randomWalkTarget);
         }
     }
-
 }

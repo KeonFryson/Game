@@ -11,7 +11,7 @@ public class Magic_Enemy : Enemy
 
     [Header("Spell Selection")]
     [SerializeField] private SpellSelectionMode selectionMode = SpellSelectionMode.Random;
-    [SerializeField] private bool cycleInOrder = false; // Only used if selectionMode is Cycle
+   // [SerializeField] private bool cycleInOrder = false; // Only used if selectionMode is Cycle
 
     private float lastAttackTime;
     private int currentSpellIndex = 0;
