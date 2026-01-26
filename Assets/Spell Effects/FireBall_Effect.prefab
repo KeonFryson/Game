@@ -4918,6 +4918,7 @@ MonoBehaviour:
   homingStrength: 5
   target: {fileID: 0}
   rotationOffset: {x: 0, y: 0, z: 0}
+  debugLogs: 0
 --- !u!54 &7393843663624192961
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4958,10 +4959,10 @@ SphereCollider:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 1024
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 1
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
   m_Radius: 1

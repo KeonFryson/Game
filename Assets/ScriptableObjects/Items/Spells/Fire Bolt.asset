@@ -16,13 +16,14 @@ MonoBehaviour:
   itemID: 3
   itemDescription: Bolt of Fire
   maxStackSize: 1
-  itemIcon: {fileID: 21300000, guid: d83d26a46db2b504fbcfa6f2aae590b6, type: 3}
+  itemIcon: {fileID: -1872550846, guid: 2eceecf27d0eb294bb3d44df738f4235, type: 3}
   itemPrefab: {fileID: 7629943672837751140, guid: 84e9752b8c51e9d4e86e558682b068a2, type: 3}
   isWeapon: 0
   damage: 0
   isConsumable: 0
   healingAmount: 0
   isSpell: 1
+  spellType: 0
   manaCost: 15
   spellChannelTime: 0
   spellCooldown: 0

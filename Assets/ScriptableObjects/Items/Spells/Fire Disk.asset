@@ -16,13 +16,14 @@ MonoBehaviour:
   itemID: 1
   itemDescription: 
   maxStackSize: 1
-  itemIcon: {fileID: 21300000, guid: 4a0aca3a5f2effb41b43cc0a1661d845, type: 3}
+  itemIcon: {fileID: -484476550, guid: 2eceecf27d0eb294bb3d44df738f4235, type: 3}
   itemPrefab: {fileID: 2813284639465042662, guid: 7855f8e6bc0e37140a386bab492e4aa0, type: 3}
   isWeapon: 0
   damage: 0
   isConsumable: 0
   healingAmount: 0
   isSpell: 1
+  spellType: 0
   manaCost: 10
   spellChannelTime: 1
   spellCooldown: 1

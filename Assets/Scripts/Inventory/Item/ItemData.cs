@@ -24,6 +24,8 @@ public class ItemData : ScriptableObject
     [Header("Spell Properties")]
     [SerializeField] public bool isSpell;
     [ConditionalHide("isSpell", true)]
+    [SerializeField] public SpellType spellType;
+    [ConditionalHide("isSpell", true)]
     [SerializeField] public int manaCost;
     [ConditionalHide("isSpell", true)]
     [SerializeField] public float spellChannelTime;
@@ -39,4 +41,12 @@ public class ItemData : ScriptableObject
     [SerializeField] public Vector3 spellCastPointOffset = Vector3.zero; // Offset from default cast point
     [ConditionalHide("isSpell", true)]
     [SerializeField] public Transform customSpellCastPoint = null; // Optional: Override cast point entirely
+}
+
+public enum SpellType
+{
+    Fire,
+    Water,
+    Air,
+    Earth
 }

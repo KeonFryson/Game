@@ -125,10 +125,13 @@ public class SpellProjectile : MonoBehaviour
             transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(rotationOffset);
         }
     }
-
-    private void OnCollisionEnter(Collision collision)
+     
+    private void OnTriggerEnter(Collider collision)
     {
+
         // Handle collision (damage, effects, etc.)
+
+
         float finalDamage = GetDamage();
         if (debugLogs)
             Debug.Log($"Spell hit: {collision.gameObject.name} for {finalDamage:F1} damage ({damageMultiplier * 100f:F0}% power)");
@@ -149,7 +152,7 @@ public class SpellProjectile : MonoBehaviour
             hitTarget = true;
         }
 
-        transform.position = collision.contacts[0].point;
+        
 
         if (!hitTarget && impactEffect != null)
         {
