@@ -1,7 +1,9 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class InventoryManger : MonoBehaviour
 {
@@ -13,10 +15,16 @@ public class InventoryManger : MonoBehaviour
     private InputSystem_Actions inputActions;
     public Inventroy inventory;
     public PlayerMovement playerController;
+    public PlayerHealth playerHealth;
     public SpellCastingManager spellCastingManager; // Add reference to spell manager
 
     public int inventorySize = 4;
 
+
+    public Slider healthBar; // Reference to health bar UI
+    public TextMeshProUGUI healthBarText; // Reference to health bar text UI
+    public Slider manaBar;   // Reference to mana bar UI
+    public TextMeshProUGUI manaBarText;
     private void Awake()
     {
 
@@ -33,6 +41,10 @@ public class InventoryManger : MonoBehaviour
         if (playerController == null)
         {
             playerController = FindFirstObjectByType<PlayerMovement>();
+        }
+        if (playerHealth == null)
+        {
+            playerHealth = FindFirstObjectByType<PlayerHealth>();
         }
         if (spellCastingManager == null)
         {
@@ -70,7 +82,25 @@ public class InventoryManger : MonoBehaviour
     {
         // Update cooldowns every frame
         UpdateCooldownVisuals();
+        UpdateHealthBar();
+        UpdateManaBar();
     }
+
+
+
+    private void UpdateHealthBar()
+    {
+        healthBar.value = playerHealth.GetCurrentHealth() / playerHealth.GetMaxHealth();
+        healthBarText.text = $"{playerHealth.GetCurrentHealth():0}/{playerHealth.GetMaxHealth():0}";
+    }
+
+    private void UpdateManaBar()
+    {
+        manaBar.value = spellCastingManager.GetCurrentMana() / spellCastingManager.GetMaxMana();
+        manaBarText.text = $"{spellCastingManager.GetCurrentMana():0}/{spellCastingManager.GetMaxMana():0}";
+    }
+
+
 
     public void OnEnable()
     {

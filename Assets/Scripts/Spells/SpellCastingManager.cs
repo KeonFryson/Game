@@ -70,7 +70,7 @@ public class SpellCastingManager : MonoBehaviour
     public event SpellChannelDelegate OnSpellChannelComplete;
     public event SpellChannelDelegate OnSpellChannelInterrupted;
 
-    [SerializeField] public TMPro.TextMeshProUGUI manaText;
+     
 
     private void Awake()
     {
@@ -161,10 +161,7 @@ public class SpellCastingManager : MonoBehaviour
         RegenerateMana();
         UpdateChanneling();
 
-        if (manaText != null && isPlayerControlled)
-        {
-            manaText.text = $"Mana: {currentMana} / {maxMana}";
-        }
+        
 
 
     }
